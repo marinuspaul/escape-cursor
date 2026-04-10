@@ -6,32 +6,83 @@ const app = express();
 const server = http.createServer(app);
 const io = new Server(server);
 
-// Serve everything in the public folder
 app.use(express.static("public"));
+
+const adjectives = [
+  "Sleepy",
+  "Grumpy",
+  "Sneaky",
+  "Wobbly",
+  "Fluffy",
+  "Clumsy",
+  "Spooky",
+  "Hangry",
+  "Goofy",
+  "Jumpy",
+  "Dizzy",
+  "Whiny",
+  "Bouncy",
+  "Cranky",
+  "Sassy",
+  "Dopey",
+  "Noisy",
+  "Cheeky",
+  "Lazy",
+  "Hyper",
+];
+
+const nouns = [
+  "Potato",
+  "Noodle",
+  "Pickle",
+  "Waffle",
+  "Burrito",
+  "Muffin",
+  "Nugget",
+  "Pretzel",
+  "Biscuit",
+  "Pancake",
+  "Dumpling",
+  "Taco",
+  "Donut",
+  "Meatball",
+  "Cupcake",
+  "Banana",
+  "Avocado",
+  "Sausage",
+  "Crouton",
+  "Nacho",
+];
+
+function generateName() {
+  const adj = adjectives[Math.floor(Math.random() * adjectives.length)];
+  const noun = nouns[Math.floor(Math.random() * nouns.length)];
+  return `${adj} ${noun}`;
+}
 
 io.on("connection", (socket) => {
   console.log("User connected:", socket.id);
 
-  // Assign each user a random color
   const userColor = `hsl(${Math.random() * 360}, 70%, 60%)`;
+  const userName = generateName();
 
-  // When someone moves their cursor, broadcast it to everyone else
   socket.on("cursor-move", (data) => {
     socket.broadcast.emit("cursor-update", {
       id: socket.id,
       x: data.x,
       y: data.y,
       color: userColor,
+      name: userName,
     });
   });
 
-  // When someone disconnects, tell everyone to remove their cursor
   socket.on("disconnect", () => {
     io.emit("user-left", socket.id);
     console.log("User left:", socket.id);
   });
 });
 
-server.listen(3000, () => {
-  console.log("Server running at http://localhost:3000");
+const PORT = process.env.PORT || 3000;
+server.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
 });

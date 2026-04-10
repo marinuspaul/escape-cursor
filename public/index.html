@@ -44,14 +44,28 @@
         color: #000;
       }
 
-      .cursor {
+      .cursor-wrapper {
         position: absolute;
-        width: 15px;
-        height: 15px;
-        border-radius: 50%;
         pointer-events: none;
         top: 0;
         left: 0;
+      }
+
+      .cursor-wrapper svg {
+        display: block;
+      }
+
+      .cursor-label {
+        margin-top: 2px;
+        margin-left: 4px;
+        font-size: 11px;
+        font-weight: 400;
+        letter-spacing: 0.3px;
+        white-space: nowrap;
+        padding: 2px 6px;
+        border-radius: 4px;
+        background: rgba(0, 0, 0, 0.08);
+        display: inline-block;
       }
     </style>
   </head>
@@ -71,6 +85,47 @@
       let audioCtx = null;
       let lastHit = 0;
       let lastEmit = 0;
+
+      // Creates a cursor arrow + name tag for a user
+      function createCursorElement(color, name) {
+        const wrapper = document.createElement("div");
+        wrapper.classList.add("cursor-wrapper");
+
+        // SVG arrow
+        const svg = document.createElementNS(
+          "http://www.w3.org/2000/svg",
+          "svg",
+        );
+        svg.setAttribute("viewBox", "0 0 24 24");
+        svg.setAttribute("width", "24");
+        svg.setAttribute("height", "24");
+
+        const path = document.createElementNS(
+          "http://www.w3.org/2000/svg",
+          "path",
+        );
+        path.setAttribute(
+          "d",
+          "M4 2 L4 18 L8 14 L12 22 L14 21 L10 13 L16 13 Z",
+        );
+        path.setAttribute("fill", color);
+        path.setAttribute("stroke", "white");
+        path.setAttribute("stroke-width", "1.2");
+        path.setAttribute("stroke-linejoin", "round");
+        svg.appendChild(path);
+
+        // Name tag
+        const label = document.createElement("span");
+        label.classList.add("cursor-label");
+        label.style.color = color;
+        label.innerText = name;
+
+        wrapper.appendChild(svg);
+        wrapper.appendChild(label);
+        document.body.appendChild(wrapper);
+
+        return wrapper;
+      }
 
       // 1. Initialize audio (must be triggered by user click)
       window.addEventListener("click", () => {
@@ -115,11 +170,8 @@
       // 4. Receive other cursors
       socket.on("cursor-update", (data) => {
         if (!otherCursors[data.id]) {
-          const div = document.createElement("div");
-          div.className = "cursor";
-          div.style.backgroundColor = data.color;
-          document.body.appendChild(div);
-          otherCursors[data.id] = { el: div, x: 0, y: 0 };
+          const el = createCursorElement(data.color, data.name);
+          otherCursors[data.id] = { el, x: 0, y: 0 };
         }
 
         const c = otherCursors[data.id];
