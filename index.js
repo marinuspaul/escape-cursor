@@ -54,22 +54,32 @@ const nouns = [
   "Nacho",
 ];
 
+// Harmonically pleasant frequencies (pentatonic scale across 3 octaves)
+const frequencies = [
+  165, 185, 220, 247, 277, 330, 370, 415, 440, 494, 554, 587, 659, 740, 880,
+];
+
 function generateName() {
   const adj = adjectives[Math.floor(Math.random() * adjectives.length)];
   const noun = nouns[Math.floor(Math.random() * nouns.length)];
   return `${adj} ${noun}`;
 }
 
-app.get("/", (req, res) => {
-  res.status(200).send("OK");
-});
-
 io.on("connection", (socket) => {
   console.log("User connected:", socket.id);
 
   const userColor = `hsl(${Math.random() * 360}, 70%, 60%)`;
   const userName = generateName();
+  const userFreq = frequencies[Math.floor(Math.random() * frequencies.length)];
 
+  // Send this user their own identity
+  socket.emit("welcome", {
+    color: userColor,
+    name: userName,
+    freq: userFreq,
+  });
+
+  // Broadcast cursor movement to everyone else
   socket.on("cursor-move", (data) => {
     socket.broadcast.emit("cursor-update", {
       id: socket.id,
@@ -77,6 +87,7 @@ io.on("connection", (socket) => {
       y: data.y,
       color: userColor,
       name: userName,
+      freq: userFreq,
     });
   });
 
@@ -86,15 +97,7 @@ io.on("connection", (socket) => {
   });
 });
 
-const PORT = process.env.PORT || 8080;
+const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
-});
-
-process.on("uncaughtException", (err) => {
-  console.error("Uncaught exception:", err);
-});
-
-process.on("unhandledRejection", (reason, promise) => {
-  console.error("Unhandled rejection at:", promise, "reason:", reason);
 });
