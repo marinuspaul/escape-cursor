@@ -64,7 +64,7 @@
       white-space: nowrap;
       padding: 2px 6px;
       border-radius: 4px;
-      background: rgba(0, 0, 0, 0.08);
+      background: rgb(255, 255, 255);
       display: inline-block;
     }
 
@@ -420,6 +420,20 @@
     img.onload = () => move();
     // 如果圖片已經快取，直接啟動
     if (img.complete) move();
+
+    window.addEventListener('resize', () => {
+      const imgWidth = img.offsetWidth;
+      const imgHeight = img.offsetHeight;
+
+      // 如果圖片位置超過了縮小後的視窗寬度，就把它貼回邊界
+      if (posX + imgWidth > window.innerWidth) {
+        posX = window.innerWidth - imgWidth;
+      }
+      // 如果圖片位置超過了縮小後的視窗高度，就把它貼回邊界
+      if (posY + imgHeight > window.innerHeight) {
+        posY = window.innerHeight - imgHeight;
+      }
+    });
   </script>
 
 
