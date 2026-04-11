@@ -1,375 +1,382 @@
 <!doctype html>
 <html>
-  <head>
-    <title>Cursor Party</title>
-    <link
-      href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400&display=swap"
-      rel="stylesheet" />
-    <style>
-      * {
-        margin: 0;
-        padding: 0;
-        box-sizing: border-box;
+
+<head>
+  <title>Cursor Party</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400&display=swap" rel="stylesheet" />
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: "Inter", sans-serif;
+      background: #fff;
+    }
+
+    #hero {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      gap: 16px;
+      pointer-events: none;
+    }
+
+    h1 {
+      font-size: 48px;
+      font-weight: 300;
+      letter-spacing: 6px;
+      text-transform: uppercase;
+      opacity: 0.5;
+      color: #000;
+    }
+
+    #instructions {
+      font-size: 14px;
+      font-weight: 400;
+      letter-spacing: 1px;
+      opacity: 0.5;
+      color: #000;
+    }
+
+    .cursor-wrapper {
+      position: absolute;
+      pointer-events: none;
+      top: 0;
+      left: 0;
+      transform-origin: top left;
+    }
+
+    .cursor-wrapper svg {
+      display: block;
+    }
+
+    .cursor-label {
+      margin-top: 2px;
+      margin-left: 4px;
+      font-size: 11px;
+      font-weight: 400;
+      letter-spacing: 0.3px;
+      white-space: nowrap;
+      padding: 2px 6px;
+      border-radius: 4px;
+      background: rgba(0, 0, 0, 0.08);
+      display: inline-block;
+    }
+
+    /* Collision wiggle animation */
+    @keyframes wiggle {
+      0% {
+        transform: scale(1) rotate(0deg);
       }
 
-      body {
-        font-family: "Inter", sans-serif;
-        background: #fff;
+      15% {
+        transform: scale(1.4) rotate(-6deg);
       }
 
-      #hero {
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-        height: 100vh;
-        gap: 16px;
-        pointer-events: none;
+      30% {
+        transform: scale(0.9) rotate(6deg);
       }
 
-      h1 {
-        font-size: 48px;
-        font-weight: 300;
-        letter-spacing: 6px;
-        text-transform: uppercase;
-        opacity: 0.5;
-        color: #000;
+      45% {
+        transform: scale(1.25) rotate(-4deg);
       }
 
-      #instructions {
-        font-size: 14px;
-        font-weight: 400;
-        letter-spacing: 1px;
-        opacity: 0.5;
-        color: #000;
+      60% {
+        transform: scale(0.95) rotate(3deg);
       }
 
-      .cursor-wrapper {
-        position: absolute;
-        pointer-events: none;
-        top: 0;
-        left: 0;
-        transform-origin: top left;
+      75% {
+        transform: scale(1.1) rotate(-2deg);
       }
 
-      .cursor-wrapper svg {
-        display: block;
+      100% {
+        transform: scale(1) rotate(0deg);
       }
+    }
 
-      .cursor-label {
-        margin-top: 2px;
-        margin-left: 4px;
-        font-size: 11px;
-        font-weight: 400;
-        letter-spacing: 0.3px;
-        white-space: nowrap;
-        padding: 2px 6px;
-        border-radius: 4px;
-        background: rgba(0, 0, 0, 0.08);
-        display: inline-block;
-      }
+    .wiggle {
+      animation: wiggle 0.45s ease forwards;
+    }
+  </style>
+</head>
 
-      /* Collision wiggle animation */
-      @keyframes wiggle {
-        0% {
-          transform: scale(1) rotate(0deg);
+<body>
+  <div id="hero">
+    <h1>Cursor Party!</h1>
+    <p id="instructions">
+      Click anywhere to enable sound — then go bump into someone!
+    </p>
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script>
+    const socket = io();
+    const otherCursors = {};
+    const myPosition = { x: 0, y: 0 };
+
+    // My own identity (received from server)
+    let myColor = null;
+    let myName = null;
+    let myBaseFreq = 220;
+
+    // Audio
+    let audioCtx = null;
+    let myOsc = null;
+    let myGain = null;
+    let audioReady = false;
+
+    // Throttle
+    let lastHit = 0;
+    let lastEmit = 0;
+
+    // ─── Receive own identity from server ───────────────────────────
+    socket.on("welcome", (data) => {
+      myColor = data.color;
+      myName = data.name;
+      myBaseFreq = data.freq;
+    });
+
+    // ─── Audio helpers ───────────────────────────────────────────────
+
+    // Slightly shift frequency based on cursor position
+    function modulateFreq(baseFreq, x, y) {
+      const xMod = (x / window.innerWidth - 0.5) * 40; // ±20 Hz
+      const yMod = (y / window.innerHeight - 0.5) * 20; // ±10 Hz
+      return baseFreq + xMod + yMod;
+    }
+
+    // Create a continuously running oscillator for a user
+    function createOscillator(freq) {
+      if (!audioCtx) return null;
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+      osc.type = "sine";
+      osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+      gain.gain.setValueAtTime(0.0, audioCtx.currentTime);
+      // Fade in gently
+      gain.gain.linearRampToValueAtTime(0.025, audioCtx.currentTime + 0.5);
+      osc.start();
+      return { osc, gain };
+    }
+
+    // Initialize audio + my own oscillator on first click
+    window.addEventListener("click", () => {
+      if (audioReady) return;
+      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      audioReady = true;
+
+      // Start my own ambient sound
+      const mine = createOscillator(myBaseFreq);
+      myOsc = mine.osc;
+      myGain = mine.gain;
+
+      // Retroactively give oscillators to cursors that appeared before click
+      for (const id in otherCursors) {
+        const c = otherCursors[id];
+        if (!c.osc) {
+          const audio = createOscillator(c.baseFreq);
+          c.osc = audio.osc;
+          c.gain = audio.gain;
         }
-        15% {
-          transform: scale(1.4) rotate(-6deg);
-        }
-        30% {
-          transform: scale(0.9) rotate(6deg);
-        }
-        45% {
-          transform: scale(1.25) rotate(-4deg);
-        }
-        60% {
-          transform: scale(0.95) rotate(3deg);
-        }
-        75% {
-          transform: scale(1.1) rotate(-2deg);
-        }
-        100% {
-          transform: scale(1) rotate(0deg);
-        }
       }
 
-      .wiggle {
-        animation: wiggle 0.45s ease forwards;
-      }
-    </style>
-  </head>
-  <body>
-    <div id="hero">
-      <h1>Cursor Party</h1>
-      <p id="instructions">
-        Click anywhere to enable sound — then go bump into someone!
-      </p>
-    </div>
+      document.getElementById("instructions").innerText =
+        "Sound enabled! Go bump into someone!";
+    });
 
-    <script src="/socket.io/socket.io.js"></script>
-    <script>
-      const socket = io();
-      const otherCursors = {};
-      const myPosition = { x: 0, y: 0 };
+    // ─── Collision effect ─────────────────────────────────────────────
+    function triggerCollision(cursor) {
+      const now = audioCtx ? audioCtx.currentTime : 0;
 
-      // My own identity (received from server)
-      let myColor = null;
-      let myName = null;
-      let myBaseFreq = 220;
+      // Wiggle the remote cursor
+      cursor.el.classList.remove("wiggle");
+      void cursor.el.offsetWidth; // force reflow so animation restarts
+      cursor.el.classList.add("wiggle");
+      cursor.el.addEventListener(
+        "animationend",
+        () => {
+          cursor.el.classList.remove("wiggle");
+        },
+        { once: true },
+      );
 
-      // Audio
-      let audioCtx = null;
-      let myOsc = null;
-      let myGain = null;
-      let audioReady = false;
+      // Spike remote cursor sound
+      if (audioCtx && cursor.osc && cursor.gain) {
+        cursor.gain.gain.cancelScheduledValues(now);
+        cursor.gain.gain.setValueAtTime(cursor.gain.gain.value, now);
+        cursor.gain.gain.linearRampToValueAtTime(0.22, now + 0.02);
+        cursor.gain.gain.setTargetAtTime(0.025, now + 0.25, 0.12);
 
-      // Throttle
-      let lastHit = 0;
-      let lastEmit = 0;
-
-      // ─── Receive own identity from server ───────────────────────────
-      socket.on("welcome", (data) => {
-        myColor = data.color;
-        myName = data.name;
-        myBaseFreq = data.freq;
-      });
-
-      // ─── Audio helpers ───────────────────────────────────────────────
-
-      // Slightly shift frequency based on cursor position
-      function modulateFreq(baseFreq, x, y) {
-        const xMod = (x / window.innerWidth - 0.5) * 40; // ±20 Hz
-        const yMod = (y / window.innerHeight - 0.5) * 20; // ±10 Hz
-        return baseFreq + xMod + yMod;
-      }
-
-      // Create a continuously running oscillator for a user
-      function createOscillator(freq) {
-        if (!audioCtx) return null;
-        const osc = audioCtx.createOscillator();
-        const gain = audioCtx.createGain();
-        osc.connect(gain);
-        gain.connect(audioCtx.destination);
-        osc.type = "sine";
-        osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
-        gain.gain.setValueAtTime(0.0, audioCtx.currentTime);
-        // Fade in gently
-        gain.gain.linearRampToValueAtTime(0.025, audioCtx.currentTime + 0.5);
-        osc.start();
-        return { osc, gain };
-      }
-
-      // Initialize audio + my own oscillator on first click
-      window.addEventListener("click", () => {
-        if (audioReady) return;
-        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-        audioReady = true;
-
-        // Start my own ambient sound
-        const mine = createOscillator(myBaseFreq);
-        myOsc = mine.osc;
-        myGain = mine.gain;
-
-        // Retroactively give oscillators to cursors that appeared before click
-        for (const id in otherCursors) {
-          const c = otherCursors[id];
-          if (!c.osc) {
-            const audio = createOscillator(c.baseFreq);
-            c.osc = audio.osc;
-            c.gain = audio.gain;
-          }
-        }
-
-        document.getElementById("instructions").innerText =
-          "Sound enabled! Go bump into someone!";
-      });
-
-      // ─── Collision effect ─────────────────────────────────────────────
-      function triggerCollision(cursor) {
-        const now = audioCtx ? audioCtx.currentTime : 0;
-
-        // Wiggle the remote cursor
-        cursor.el.classList.remove("wiggle");
-        void cursor.el.offsetWidth; // force reflow so animation restarts
-        cursor.el.classList.add("wiggle");
-        cursor.el.addEventListener(
-          "animationend",
-          () => {
-            cursor.el.classList.remove("wiggle");
-          },
-          { once: true },
+        cursor.osc.frequency.cancelScheduledValues(now);
+        cursor.osc.frequency.setValueAtTime(cursor.osc.frequency.value, now);
+        cursor.osc.frequency.linearRampToValueAtTime(
+          cursor.baseFreq * 1.6,
+          now + 0.02,
         );
-
-        // Spike remote cursor sound
-        if (audioCtx && cursor.osc && cursor.gain) {
-          cursor.gain.gain.cancelScheduledValues(now);
-          cursor.gain.gain.setValueAtTime(cursor.gain.gain.value, now);
-          cursor.gain.gain.linearRampToValueAtTime(0.22, now + 0.02);
-          cursor.gain.gain.setTargetAtTime(0.025, now + 0.25, 0.12);
-
-          cursor.osc.frequency.cancelScheduledValues(now);
-          cursor.osc.frequency.setValueAtTime(cursor.osc.frequency.value, now);
-          cursor.osc.frequency.linearRampToValueAtTime(
-            cursor.baseFreq * 1.6,
-            now + 0.02,
-          );
-          cursor.osc.frequency.setTargetAtTime(
-            cursor.baseFreq,
-            now + 0.25,
-            0.12,
-          );
-        }
-
-        // Spike my own sound too
-        if (audioCtx && myOsc && myGain) {
-          myGain.gain.cancelScheduledValues(now);
-          myGain.gain.setValueAtTime(myGain.gain.value, now);
-          myGain.gain.linearRampToValueAtTime(0.22, now + 0.02);
-          myGain.gain.setTargetAtTime(0.025, now + 0.25, 0.12);
-
-          myOsc.frequency.cancelScheduledValues(now);
-          myOsc.frequency.setValueAtTime(myOsc.frequency.value, now);
-          myOsc.frequency.linearRampToValueAtTime(myBaseFreq * 1.6, now + 0.02);
-          myOsc.frequency.setTargetAtTime(myBaseFreq, now + 0.25, 0.12);
-        }
+        cursor.osc.frequency.setTargetAtTime(
+          cursor.baseFreq,
+          now + 0.25,
+          0.12,
+        );
       }
 
-      // ─── Build cursor DOM element ─────────────────────────────────────
-      function createCursorElement(color, name) {
-        const wrapper = document.createElement("div");
-        wrapper.classList.add("cursor-wrapper");
+      // Spike my own sound too
+      if (audioCtx && myOsc && myGain) {
+        myGain.gain.cancelScheduledValues(now);
+        myGain.gain.setValueAtTime(myGain.gain.value, now);
+        myGain.gain.linearRampToValueAtTime(0.22, now + 0.02);
+        myGain.gain.setTargetAtTime(0.025, now + 0.25, 0.12);
 
-        const svg = document.createElementNS(
-          "http://www.w3.org/2000/svg",
-          "svg",
-        );
-        svg.setAttribute("viewBox", "0 0 24 24");
-        svg.setAttribute("width", "24");
-        svg.setAttribute("height", "24");
+        myOsc.frequency.cancelScheduledValues(now);
+        myOsc.frequency.setValueAtTime(myOsc.frequency.value, now);
+        myOsc.frequency.linearRampToValueAtTime(myBaseFreq * 1.6, now + 0.02);
+        myOsc.frequency.setTargetAtTime(myBaseFreq, now + 0.25, 0.12);
+      }
+    }
 
-        const path = document.createElementNS(
-          "http://www.w3.org/2000/svg",
-          "path",
-        );
-        path.setAttribute(
-          "d",
-          "M4 2 L4 18 L8 14 L12 22 L14 21 L10 13 L16 13 Z",
-        );
-        path.setAttribute("fill", color);
-        path.setAttribute("stroke", "white");
-        path.setAttribute("stroke-width", "1.2");
-        path.setAttribute("stroke-linejoin", "round");
-        svg.appendChild(path);
+    // ─── Build cursor DOM element ─────────────────────────────────────
+    function createCursorElement(color, name) {
+      const wrapper = document.createElement("div");
+      wrapper.classList.add("cursor-wrapper");
 
-        const label = document.createElement("span");
-        label.classList.add("cursor-label");
-        label.style.color = color;
-        label.innerText = name;
+      const svg = document.createElementNS(
+        "http://www.w3.org/2000/svg",
+        "svg",
+      );
+      svg.setAttribute("viewBox", "0 0 24 24");
+      svg.setAttribute("width", "24");
+      svg.setAttribute("height", "24");
 
-        wrapper.appendChild(svg);
-        wrapper.appendChild(label);
-        document.body.appendChild(wrapper);
+      const path = document.createElementNS(
+        "http://www.w3.org/2000/svg",
+        "path",
+      );
+      path.setAttribute(
+        "d",
+        "M4 2 L4 18 L8 14 L12 22 L14 21 L10 13 L16 13 Z",
+      );
+      path.setAttribute("fill", color);
+      path.setAttribute("stroke", "white");
+      path.setAttribute("stroke-width", "1.2");
+      path.setAttribute("stroke-linejoin", "round");
+      svg.appendChild(path);
 
-        return wrapper;
+      const label = document.createElement("span");
+      label.classList.add("cursor-label");
+      label.style.color = color;
+      label.innerText = name;
+
+      wrapper.appendChild(svg);
+      wrapper.appendChild(label);
+      document.body.appendChild(wrapper);
+
+      return wrapper;
+    }
+
+    // ─── Mouse tracking ───────────────────────────────────────────────
+    window.addEventListener("mousemove", (e) => {
+      const now = Date.now();
+      if (now - lastEmit < 16) return;
+      lastEmit = now;
+
+      myPosition.x = e.clientX + window.scrollX;
+      myPosition.y = e.clientY + window.scrollY;
+
+      socket.emit("cursor-move", { x: myPosition.x, y: myPosition.y });
+
+      // Modulate my own sound with position
+      if (audioCtx && myOsc) {
+        const modFreq = modulateFreq(myBaseFreq, myPosition.x, myPosition.y);
+        myOsc.frequency.setTargetAtTime(modFreq, audioCtx.currentTime, 0.08);
       }
 
-      // ─── Mouse tracking ───────────────────────────────────────────────
-      window.addEventListener("mousemove", (e) => {
-        const now = Date.now();
-        if (now - lastEmit < 16) return;
-        lastEmit = now;
+      checkCollision();
+    });
 
-        myPosition.x = e.clientX + window.scrollX;
-        myPosition.y = e.clientY + window.scrollY;
+    // ─── Receive other cursors ────────────────────────────────────────
+    socket.on("cursor-update", (data) => {
+      // First time seeing this user
+      if (!otherCursors[data.id]) {
+        const el = createCursorElement(data.color, data.name);
+        const entry = {
+          el,
+          x: 0,
+          y: 0,
+          baseFreq: data.freq,
+          osc: null,
+          gain: null,
+        };
 
-        socket.emit("cursor-move", { x: myPosition.x, y: myPosition.y });
-
-        // Modulate my own sound with position
-        if (audioCtx && myOsc) {
-          const modFreq = modulateFreq(myBaseFreq, myPosition.x, myPosition.y);
-          myOsc.frequency.setTargetAtTime(modFreq, audioCtx.currentTime, 0.08);
+        // Only create oscillator if audio is already running
+        if (audioReady) {
+          const audio = createOscillator(data.freq);
+          entry.osc = audio.osc;
+          entry.gain = audio.gain;
         }
 
-        checkCollision();
-      });
-
-      // ─── Receive other cursors ────────────────────────────────────────
-      socket.on("cursor-update", (data) => {
-        // First time seeing this user
-        if (!otherCursors[data.id]) {
-          const el = createCursorElement(data.color, data.name);
-          const entry = {
-            el,
-            x: 0,
-            y: 0,
-            baseFreq: data.freq,
-            osc: null,
-            gain: null,
-          };
-
-          // Only create oscillator if audio is already running
-          if (audioReady) {
-            const audio = createOscillator(data.freq);
-            entry.osc = audio.osc;
-            entry.gain = audio.gain;
-          }
-
-          otherCursors[data.id] = entry;
-        }
-
-        const c = otherCursors[data.id];
-        c.x = data.x;
-        c.y = data.y;
-        c.el.style.left = c.x + "px";
-        c.el.style.top = c.y + "px";
-
-        // Modulate their sound with their position
-        if (audioCtx && c.osc) {
-          const modFreq = modulateFreq(c.baseFreq, data.x, data.y);
-          c.osc.frequency.setTargetAtTime(modFreq, audioCtx.currentTime, 0.08);
-        }
-
-        checkCollision();
-      });
-
-      // ─── Collision detection ──────────────────────────────────────────
-      function checkCollision() {
-        const now = Date.now();
-        if (now - lastHit < 300) return;
-
-        for (const id in otherCursors) {
-          const other = otherCursors[id];
-          const dx = myPosition.x - other.x;
-          const dy = myPosition.y - other.y;
-          const distance = Math.sqrt(dx * dx + dy * dy);
-
-          if (distance < 20) {
-            lastHit = now;
-            triggerCollision(other);
-            break;
-          }
-        }
+        otherCursors[data.id] = entry;
       }
 
-      // ─── User leaves ──────────────────────────────────────────────────
-      socket.on("user-left", (id) => {
-        if (otherCursors[id]) {
-          // Fade out their sound before removing
-          if (audioCtx && otherCursors[id].gain) {
-            const g = otherCursors[id].gain;
-            g.gain.setTargetAtTime(0, audioCtx.currentTime, 0.1);
-            // Stop oscillator after fade
-            setTimeout(() => {
-              try {
-                otherCursors[id].osc.stop();
-              } catch (e) {}
-            }, 500);
-          }
-          otherCursors[id].el.remove();
-          delete otherCursors[id];
+      const c = otherCursors[data.id];
+      c.x = data.x;
+      c.y = data.y;
+      c.el.style.left = c.x + "px";
+      c.el.style.top = c.y + "px";
+
+      // Modulate their sound with their position
+      if (audioCtx && c.osc) {
+        const modFreq = modulateFreq(c.baseFreq, data.x, data.y);
+        c.osc.frequency.setTargetAtTime(modFreq, audioCtx.currentTime, 0.08);
+      }
+
+      checkCollision();
+    });
+
+    // ─── Collision detection ──────────────────────────────────────────
+    function checkCollision() {
+      const now = Date.now();
+      if (now - lastHit < 300) return;
+
+      for (const id in otherCursors) {
+        const other = otherCursors[id];
+        const dx = myPosition.x - other.x;
+        const dy = myPosition.y - other.y;
+        const distance = Math.sqrt(dx * dx + dy * dy);
+
+        if (distance < 20) {
+          lastHit = now;
+          triggerCollision(other);
+          break;
         }
-      });
-    </script>
-  </body>
+      }
+    }
+
+    // ─── User leaves ──────────────────────────────────────────────────
+    socket.on("user-left", (id) => {
+      if (otherCursors[id]) {
+        // Fade out their sound before removing
+        if (audioCtx && otherCursors[id].gain) {
+          const g = otherCursors[id].gain;
+          g.gain.setTargetAtTime(0, audioCtx.currentTime, 0.1);
+          // Stop oscillator after fade
+          setTimeout(() => {
+            try {
+              otherCursors[id].osc.stop();
+            } catch (e) { }
+          }, 500);
+        }
+        otherCursors[id].el.remove();
+        delete otherCursors[id];
+      }
+    });
+  </script>
+</body>
+
 </html>
