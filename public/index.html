@@ -13,7 +13,7 @@
 
     body {
       font-family: "Inter", sans-serif;
-      background: #fff;
+      background: #a1cd6b;
     }
 
     #hero {
@@ -106,14 +106,18 @@
 </head>
 
 <body>
+  <!--
   <div id="hero">
-    <h1>Cursor Party!</h1>
+    <h1>Cursor Party</h1>
     <p id="instructions">
       Click anywhere to enable sound — then go bump into someone!
     </p>
-  </div>
+  </div> -->
+
+  <img id="bouncingImage" src="/image/dvd.png" style="position: absolute; width: 290px; z-index: 1000; opacity: 0.3;" />
 
   <script src="/socket.io/socket.io.js"></script>
+
   <script>
     const socket = io();
     const otherCursors = {};
@@ -377,6 +381,49 @@
       }
     });
   </script>
+
+  <!-- dvd logo control -->
+  <script>
+    const img = document.getElementById('bouncingImage');
+    let posX = Math.random() * (window.innerWidth - 100); // 初始 X 位置
+    let posY = Math.random() * (window.innerHeight - 100); // 初始 Y 位置
+    let velX = 1; // X 軸移動速度
+    let velY = 1; // Y 軸移動速度
+
+    function move() {
+      const imgWidth = img.offsetWidth;
+      const imgHeight = img.offsetHeight;
+
+      // 更新座標
+      posX += velX;
+      posY += velY;
+
+      // 碰撞檢查：左右邊界
+      if (posX + imgWidth >= window.innerWidth || posX <= 0) {
+        velX = -velX; // 反轉方向
+      }
+      // 碰撞檢查：上下邊界
+      if (posY + imgHeight >= window.innerHeight || posY <= 0) {
+        velY = -velY; // 反轉方向
+      }
+
+      // 套用新位置
+      img.style.left = posX + 'px';
+      img.style.top = posY + 'px';
+
+      requestAnimationFrame(move); // 持續循環動畫
+    }
+
+    // 確保圖片載入後開始移動
+    img.onload = () => move();
+    // 如果圖片已經快取，直接啟動
+    if (img.complete) move();
+  </script>
+
+
+  </script>
+
+
 </body>
 
 </html>
