@@ -121,6 +121,8 @@
 
   <script>
     const socket = io();
+    const collisionSound = new Audio('sound/hellobobo.mp3');
+    collisionSound.load();
     const otherCursors = {};
     const myPosition = { x: 0, y: 0 };
 
@@ -148,61 +150,32 @@
 
     // ─── Audio helpers ───────────────────────────────────────────────
 
-    // Slightly shift frequency based on cursor position
+    // 如果你不需要背景嗡嗡聲，這個 function 可以留空或刪除
     function modulateFreq(baseFreq, x, y) {
-      const xMod = (x / window.innerWidth - 0.5) * 40; // ±20 Hz
-      const yMod = (y / window.innerHeight - 0.5) * 20; // ±10 Hz
-      return baseFreq + xMod + yMod;
+      return baseFreq;
     }
 
-    // Create a continuously running oscillator for a user
+    // 如果你不想要背景一直有聲音，可以讓這個 function 回傳 null
     function createOscillator(freq) {
-      if (!audioCtx) return null;
-      const osc = audioCtx.createOscillator();
-      const gain = audioCtx.createGain();
-      osc.connect(gain);
-      gain.connect(audioCtx.destination);
-      osc.type = "sine";
-      osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
-      gain.gain.setValueAtTime(0.0, audioCtx.currentTime);
-      // Fade in gently
-      gain.gain.linearRampToValueAtTime(0.025, audioCtx.currentTime + 0.5);
-      osc.start();
-      return { osc, gain };
+      return null;
     }
 
-    // Initialize audio + my own oscillator on first click
+    // 初始化：點擊後啟用音效權限
     window.addEventListener("click", () => {
       if (audioReady) return;
       audioCtx = new (window.AudioContext || window.webkitAudioContext)();
       audioReady = true;
 
-      // Start my own ambient sound
-      const mine = createOscillator(myBaseFreq);
-      myOsc = mine.osc;
-      myGain = mine.gain;
-
-      // Retroactively give oscillators to cursors that appeared before click
-      for (const id in otherCursors) {
-        const c = otherCursors[id];
-        if (!c.osc) {
-          const audio = createOscillator(c.baseFreq);
-          c.osc = audio.osc;
-          c.gain = audio.gain;
-        }
-      }
-
-      document.getElementById("instructions").innerText =
-        "Sound enabled! Go bump into someone!";
+      // 這裡我們不再啟動 oscillator，改為顯示成功訊息
+      const instructions = document.getElementById("instructions");
+      if (instructions) instructions.innerText = "Sound enabled! Go bump into someone!";
     });
 
     // ─── Collision effect ─────────────────────────────────────────────
     function triggerCollision(cursor) {
-      const now = audioCtx ? audioCtx.currentTime : 0;
-
-      // Wiggle the remote cursor
+      // 1. 視覺效果：保持原本的 Wiggle 動畫
       cursor.el.classList.remove("wiggle");
-      void cursor.el.offsetWidth; // force reflow so animation restarts
+      void cursor.el.offsetWidth;
       cursor.el.classList.add("wiggle");
       cursor.el.addEventListener(
         "animationend",
@@ -212,37 +185,12 @@
         { once: true },
       );
 
-      // Spike remote cursor sound
-      if (audioCtx && cursor.osc && cursor.gain) {
-        cursor.gain.gain.cancelScheduledValues(now);
-        cursor.gain.gain.setValueAtTime(cursor.gain.gain.value, now);
-        cursor.gain.gain.linearRampToValueAtTime(0.22, now + 0.02);
-        cursor.gain.gain.setTargetAtTime(0.025, now + 0.25, 0.12);
-
-        cursor.osc.frequency.cancelScheduledValues(now);
-        cursor.osc.frequency.setValueAtTime(cursor.osc.frequency.value, now);
-        cursor.osc.frequency.linearRampToValueAtTime(
-          cursor.baseFreq * 1.6,
-          now + 0.02,
-        );
-        cursor.osc.frequency.setTargetAtTime(
-          cursor.baseFreq,
-          now + 0.25,
-          0.12,
-        );
-      }
-
-      // Spike my own sound too
-      if (audioCtx && myOsc && myGain) {
-        myGain.gain.cancelScheduledValues(now);
-        myGain.gain.setValueAtTime(myGain.gain.value, now);
-        myGain.gain.linearRampToValueAtTime(0.22, now + 0.02);
-        myGain.gain.setTargetAtTime(0.025, now + 0.25, 0.12);
-
-        myOsc.frequency.cancelScheduledValues(now);
-        myOsc.frequency.setValueAtTime(myOsc.frequency.value, now);
-        myOsc.frequency.linearRampToValueAtTime(myBaseFreq * 1.6, now + 0.02);
-        myOsc.frequency.setTargetAtTime(myBaseFreq, now + 0.25, 0.12);
+      // 2. 播放 MP3 音效
+      if (audioReady) {
+        // 使用 cloneNode 確保快速連續碰撞時，聲音可以重疊播放不會被切斷
+        const soundInstance = collisionSound.cloneNode();
+        soundInstance.volume = 0.6; // 這裡可以調整音量大小 (0.0 到 1.0)
+        soundInstance.play().catch(e => console.error("音效播放失敗:", e));
       }
     }
 
