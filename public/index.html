@@ -14,6 +14,7 @@
     body {
       font-family: "Inter", sans-serif;
       background: #a1cd6b;
+      cursor: none;
     }
 
     #hero {
@@ -49,6 +50,7 @@
       top: 0;
       left: 0;
       transform-origin: top left;
+      z-index: 2000;
     }
 
     .cursor-wrapper svg {
@@ -122,7 +124,16 @@
   <script>
     const socket = io();
     const soundFiles = ['sound1.mp3', 'sound2.mp3', 'sound3.mp3'];
-    const soundList = soundFiles.map(file => new Audio(`sound/${file}`));
+    const collisionPoolSize = 4;
+    const soundPools = soundFiles.map((file) => {
+      const src = `sound/${file}`;
+      return Array.from({ length: collisionPoolSize }, () => {
+        const audio = new Audio(src);
+        audio.preload = "auto";
+        return audio;
+      });
+    });
+    const backgroundMusic = new Audio("sound/bg.mp3");
     const otherCursors = {};
     const myPosition = { x: 0, y: 0 };
 
@@ -130,6 +141,7 @@
     let myColor = null;
     let myName = null;
     let myBaseFreq = 220;
+    let myCursorEl = null;
 
     // Audio
     let audioCtx = null;
@@ -146,6 +158,12 @@
       myColor = data.color;
       myName = data.name;
       myBaseFreq = data.freq;
+
+      if (!myCursorEl) {
+        myCursorEl = createCursorElement(myColor, myName);
+      }
+
+      updateMyCursorPosition();
     });
 
     // ─── Audio helpers ───────────────────────────────────────────────
@@ -163,7 +181,14 @@
       audioCtx = new (window.AudioContext || window.webkitAudioContext)();
       audioReady = true;
 
-      soundList.forEach(s => s.load());
+      backgroundMusic.loop = true;
+      backgroundMusic.preload = "auto";
+      backgroundMusic.volume = 0.25;
+      backgroundMusic.play().catch(e => console.error("背景音樂播放失敗:", e));
+      soundPools.flat().forEach((sound) => {
+        sound.currentTime = 0;
+        sound.load();
+      });
 
       const instructions = document.getElementById("instructions");
       if (instructions) instructions.innerText = "Sound enabled! Go bump into someone!";
@@ -184,11 +209,15 @@
       );
 
       // 2. 隨機播放 MP3 音效
-      if (audioReady && soundList.length > 0) {
-        // 隨機從陣列中挑選一個音效
-        const randomIndex = Math.floor(Math.random() * soundList.length);
-        const selectedSound = soundList[randomIndex];
-        const soundInstance = selectedSound.cloneNode();
+      if (audioReady && soundPools.length > 0) {
+        // 從預載好的 pool 中挑一個可立即播放的音效實例，降低碰撞延遲
+        const randomIndex = Math.floor(Math.random() * soundPools.length);
+        const selectedPool = soundPools[randomIndex];
+        const soundInstance =
+          selectedPool.find((sound) => sound.paused || sound.ended) || selectedPool[0];
+
+        soundInstance.pause();
+        soundInstance.currentTime = 0;
         soundInstance.volume = 0.6;
         soundInstance.play().catch(e => console.error("音效播放失敗:", e));
       }
@@ -233,6 +262,12 @@
       return wrapper;
     }
 
+    function updateMyCursorPosition() {
+      if (!myCursorEl) return;
+      myCursorEl.style.left = myPosition.x + "px";
+      myCursorEl.style.top = myPosition.y + "px";
+    }
+
     // ─── Mouse tracking ───────────────────────────────────────────────
     window.addEventListener("mousemove", (e) => {
       const now = Date.now();
@@ -241,6 +276,7 @@
 
       myPosition.x = e.clientX + window.scrollX;
       myPosition.y = e.clientY + window.scrollY;
+      updateMyCursorPosition();
 
       socket.emit("cursor-move", { x: myPosition.x, y: myPosition.y });
 
