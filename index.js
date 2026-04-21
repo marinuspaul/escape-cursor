@@ -3,14 +3,21 @@ const http = require("http");
 const { Server } = require("socket.io");
 
 const app = express();
-app.use(express.static('public'));
+app.use(express.static("public"));
 const server = http.createServer(app);
-const io = new Server(server, { cors: { origin: "*", methods: ["GET", "POST"] } });
-io.engine.on("connection_error", (err) => { console.error("Socket.io connection error:", err); });
+const io = new Server(server, {
+  cors: { origin: "*", methods: ["GET", "POST"] },
+});
+io.engine.on("connection_error", (err) => {
+  console.error("Socket.io connection error:", err);
+});
 
 app.use(express.static("public"));
 
-app.get('/', (req, res) => { console.log('Health check request received'); res.status(200).send('OK'); });
+app.get("/", (req, res) => {
+  console.log("Health check request received");
+  res.status(200).send("OK");
+});
 
 // Level system
 let currentLevel = 0;
@@ -18,31 +25,33 @@ const levels = [
   {
     id: 0,
     title: "Welcome to Escape Room",
-    instructions: "All players: Move your cursor to the center of the screen and get ready!",
-    completed: false
+    instructions:
+      "All players: Move your cursor to the center of the screen and get ready!",
+    completed: false,
   },
   {
     id: 1,
     title: "Level 1: Cursor Collision",
     instructions: "Make all players' cursors collide at least once!",
-    completed: false
+    completed: false,
   },
   {
     id: 2,
-    title: "Level 2: Cursor Dance",
-    instructions: "Move your cursor in circles around the screen!",
-    completed: false
+    title: "Level 2: Click to Expand Black",
+    instructions:
+      "Tap the white areas to expand the black circle and fill the screen!",
+    completed: false,
   },
   {
     id: 3,
     title: "Congratulations!",
     instructions: "You've successfully escaped the room!",
-    completed: true
-  }
+    completed: true,
+  },
 ];
 
-app.get('/host', (req, res) => {
-  res.sendFile(__dirname + '/public/host.html');
+app.get("/host", (req, res) => {
+  res.sendFile(__dirname + "/public/host.html");
 });
 
 const adjectives = [
@@ -150,18 +159,31 @@ io.on("connection", (socket) => {
     console.log("Game reset to level 0");
   });
 
+  // Level completion
+  socket.on("level-complete", () => {
+    console.log(`Player ${socket.id} completed level ${currentLevel}`);
+    // Could add logic to track completion progress here
+  });
+
   socket.on("disconnect", () => {
     io.emit("user-left", socket.id);
     console.log("User left:", socket.id);
   });
 });
 
-app.use((err, req, res, next) => { console.error('Express error:', err); res.status(500).send('Internal Server Error'); });
+app.use((err, req, res, next) => {
+  console.error("Express error:", err);
+  res.status(500).send("Internal Server Error");
+});
 
 const PORT = process.env.PORT || 8080;
-server.listen(PORT, '0.0.0.0', () => {
+server.listen(PORT, "0.0.0.0", () => {
   console.log(`Server running on port ${PORT}`);
 });
 
-process.on("uncaughtException", (err) => { console.error("Uncaught exception:", err); });
-process.on("unhandledRejection", (reason, promise) => { console.error("Unhandled rejection at:", promise, "reason:", reason); });
+process.on("uncaughtException", (err) => {
+  console.error("Uncaught exception:", err);
+});
+process.on("unhandledRejection", (reason, promise) => {
+  console.error("Unhandled rejection at:", promise, "reason:", reason);
+});

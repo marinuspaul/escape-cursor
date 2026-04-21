@@ -1,415 +1,632 @@
 <!doctype html>
 <html>
-
-<head>
-  <title>Cursor Party</title>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400&display=swap" rel="stylesheet" />
-  <style>
-    * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
-      cursor: none !important;
-    }
-
-    html,
-    body {
-      font-family: "Inter", sans-serif;
-      background: #a1cd6b;
-      cursor: none;
-    }
-
-    #hero {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      height: 100vh;
-      gap: 16px;
-      pointer-events: none;
-    }
-
-    h1 {
-      font-size: 48px;
-      font-weight: 300;
-      letter-spacing: 6px;
-      text-transform: uppercase;
-      opacity: 0.5;
-      color: #000;
-    }
-
-    #instructions {
-      font-size: 14px;
-      font-weight: 400;
-      letter-spacing: 1px;
-      opacity: 0.5;
-      color: #000;
-    }
-
-    .cursor-wrapper {
-      position: absolute;
-      pointer-events: none;
-      top: 0;
-      left: 0;
-      transform-origin: top left;
-      z-index: 2000;
-    }
-
-    .cursor-wrapper svg {
-      display: block;
-    }
-
-    .cursor-label {
-      margin-top: 2px;
-      margin-left: 4px;
-      font-size: 11px;
-      font-weight: 400;
-      letter-spacing: 0.3px;
-      white-space: nowrap;
-      padding: 2px 6px;
-      border-radius: 4px;
-      background: rgb(255, 255, 255, 1);
-      display: inline-block;
-    }
-
-    /* Collision wiggle animation */
-    @keyframes wiggle {
-      0% {
-        transform: scale(1) rotate(0deg);
+  <head>
+    <title>Cursor Party</title>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+        cursor: none !important;
       }
 
-      15% {
-        transform: scale(1.4) rotate(-6deg);
+      html,
+      body {
+        font-family: "Inter", sans-serif;
+        background: #a1cd6b;
+        cursor: none;
       }
 
-      30% {
-        transform: scale(0.9) rotate(6deg);
+      #hero {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        height: 100vh;
+        gap: 16px;
+        pointer-events: none;
       }
 
-      45% {
-        transform: scale(1.25) rotate(-4deg);
+      h1 {
+        font-size: 48px;
+        font-weight: 300;
+        letter-spacing: 6px;
+        text-transform: uppercase;
+        opacity: 0.5;
+        color: #000;
       }
 
-      60% {
-        transform: scale(0.95) rotate(3deg);
+      #instructions {
+        font-size: 14px;
+        font-weight: 400;
+        letter-spacing: 1px;
+        opacity: 0.5;
+        color: #000;
       }
 
-      75% {
-        transform: scale(1.1) rotate(-2deg);
+      .cursor-wrapper {
+        position: absolute;
+        pointer-events: none;
+        top: 0;
+        left: 0;
+        transform-origin: top left;
+        z-index: 2000;
       }
 
-      100% {
-        transform: scale(1) rotate(0deg);
-      }
-    }
-
-    .wiggle {
-      animation: wiggle 0.45s ease forwards;
-    }
-  </style>
-</head>
-
-<body>
-  <div id="hero">
-    <h1 id="level-title">Cursor Party</h1>
-    <p id="level-instructions">
-      Click anywhere to enable sound — then go bump into someone!
-    </p>
-  </div>
-
-  <img id="bouncingImage" src="./image/dvd.png"
-    style="position: absolute; width: 290px; z-index: 1000; opacity: 0; display: none;" />
-
-  <script src="/socket.io/socket.io.js"></script>
-
-  <script>
-    const socket = io();
-    const soundFiles = ['sound1.mp3', 'sound2.mp3', 'sound3.mp3'];
-    const collisionPoolSize = 4;
-    const soundPools = soundFiles.map((file) => {
-      const src = `sound/${file}`;
-      return Array.from({ length: collisionPoolSize }, () => {
-        const audio = new Audio(src);
-        audio.preload = "auto";
-        return audio;
-      });
-    });
-    const backgroundMusic = new Audio();
-    const otherCursors = {};
-    const myPosition = { x: 0, y: 0 };
-
-    // My own identity (received from server)
-    let myColor = null;
-    let myName = null;
-    let myBaseFreq = 220;
-    let myBackgroundTrack = null;
-    let myCursorEl = null;
-
-    // Audio
-    let audioCtx = null;
-    let myOsc = null;
-    let myGain = null;
-    let audioReady = false;
-
-    // Throttle
-    let lastEmit = 0;
-    const collisionCooldownMs = 300;
-    const collisionHitboxSize = 18;
-    const collisionPadding = 10;
-    const lastHitByCursor = {};
-
-    // ─── Receive own identity from server ───────────────────────────
-    socket.on("welcome", (data) => {
-      myColor = data.color;
-      myName = data.name;
-      myBaseFreq = data.freq;
-      myBackgroundTrack = data.backgroundTrack;
-
-      if (myBackgroundTrack) {
-        backgroundMusic.src = `sound/${myBackgroundTrack}`;
-        backgroundMusic.preload = "auto";
-        backgroundMusic.load();
+      .cursor-wrapper svg {
+        display: block;
       }
 
-      if (!myCursorEl) {
-        myCursorEl = createCursorElement(myColor, myName);
+      .cursor-label {
+        margin-top: 2px;
+        margin-left: 4px;
+        font-size: 11px;
+        font-weight: 400;
+        letter-spacing: 0.3px;
+        white-space: nowrap;
+        padding: 2px 6px;
+        border-radius: 4px;
+        background: rgb(255, 255, 255, 1);
+        display: inline-block;
       }
 
-      updateMyCursorPosition();
-    });
-
-    // ─── Receive level updates ──────────────────────────────────────
-    socket.on("level-update", (levelData) => {
-      document.getElementById('level-title').textContent = levelData.title;
-      document.getElementById('level-instructions').textContent = levelData.instructions;
-    });
-
-    // ─── Audio helpers ───────────────────────────────────────────────
-    function modulateFreq(baseFreq, x, y) {
-      return baseFreq;
-    }
-
-    function createOscillator(freq) {
-      return null;
-    }
-
-    window.addEventListener("click", () => {
-      if (audioReady) return;
-      // Activate AudioContext and preload all sound effects
-      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-      audioReady = true;
-
-      if (myBackgroundTrack) {
-        backgroundMusic.loop = true;
-        backgroundMusic.volume = 0.25;
-        backgroundMusic.play().catch(e => console.error("Background music playback failed:", e));
-      }
-      soundPools.flat().forEach((sound) => {
-        sound.currentTime = 0;
-        sound.load();
-      });
-
-      const instructions = document.getElementById("instructions");
-      if (instructions) instructions.innerText = "Sound enabled! Go bump into someone!";
-    });
-
-    // ─── Collision effect ─────────────────────────────────────────────
-    function triggerCollision(cursor) {
-      // 1. Visual effect: Keep the original Wiggle animation
-      if (!cursor?.el) return;
-      cursor.el.classList.remove("wiggle");
-      void cursor.el.offsetWidth;
-      cursor.el.classList.add("wiggle");
-      cursor.el.addEventListener(
-        "animationend",
-        () => {
-          cursor.el.classList.remove("wiggle");
-        },
-        { once: true },
-      );
-
-      // 2. Play random MP3 sound effect
-      if (audioReady && soundPools.length > 0) {
-        // Pick a ready-to-play sound instance from the pool to reduce collision delay
-        const randomIndex = Math.floor(Math.random() * soundPools.length);
-        const selectedPool = soundPools[randomIndex];
-        const soundInstance =
-          selectedPool.find((sound) => sound.paused || sound.ended) || selectedPool[0];
-
-        soundInstance.pause();
-        soundInstance.currentTime = 0;
-        soundInstance.volume = 0.6;
-        soundInstance.play().catch(e => console.error("Sound playback failed:", e));
-      }
-    }
-
-    // ─── Build cursor DOM element ─────────────────────────────────────
-    function createCursorElement(color, name) {
-      const wrapper = document.createElement("div");
-      wrapper.classList.add("cursor-wrapper");
-
-      const svg = document.createElementNS(
-        "http://www.w3.org/2000/svg",
-        "svg",
-      );
-      svg.setAttribute("viewBox", "0 0 24 24");
-      svg.setAttribute("width", "24");
-      svg.setAttribute("height", "24");
-
-      const path = document.createElementNS(
-        "http://www.w3.org/2000/svg",
-        "path",
-      );
-      path.setAttribute(
-        "d",
-        "M4 2 L4 18 L8 14 L12 22 L14 21 L10 13 L16 13 Z",
-      );
-      path.setAttribute("fill", color);
-      path.setAttribute("stroke", "white");
-      path.setAttribute("stroke-width", "1.2");
-      path.setAttribute("stroke-linejoin", "round");
-      svg.appendChild(path);
-
-      const label = document.createElement("span");
-      label.classList.add("cursor-label");
-      label.style.color = color;
-      label.innerText = name;
-
-      wrapper.appendChild(svg);
-      wrapper.appendChild(label);
-      document.body.appendChild(wrapper);
-
-      return wrapper;
-    }
-
-    function updateMyCursorPosition() {
-      if (!myCursorEl) return;
-      myCursorEl.style.left = myPosition.x + "px";
-      myCursorEl.style.top = myPosition.y + "px";
-    }
-
-    function isCollidingWithCursor(pointX, pointY, cursor) {
-      if (!cursor?.el) return false;
-
-      const left = cursor.x - collisionPadding;
-      const top = cursor.y - collisionPadding;
-      const right = cursor.x + cursor.el.offsetWidth + collisionPadding;
-      const bottom = cursor.y + cursor.el.offsetHeight + collisionPadding;
-
-      const halfHitbox = collisionHitboxSize / 2;
-      const pointLeft = pointX - halfHitbox;
-      const pointTop = pointY - halfHitbox;
-      const pointRight = pointX + halfHitbox;
-      const pointBottom = pointY + halfHitbox;
-
-      return (
-        pointLeft < right &&
-        pointRight > left &&
-        pointTop < bottom &&
-        pointBottom > top
-      );
-    }
-
-    // ─── Mouse tracking ───────────────────────────────────────────────
-    window.addEventListener("mousemove", (e) => {
-      const now = Date.now();
-      if (now - lastEmit < 16) return;
-      lastEmit = now;
-
-      myPosition.x = e.clientX + window.scrollX;
-      myPosition.y = e.clientY + window.scrollY;
-      updateMyCursorPosition();
-
-      socket.emit("cursor-move", { x: myPosition.x, y: myPosition.y });
-
-      // Modulate my own sound with position
-      if (audioCtx && myOsc) {
-        const modFreq = modulateFreq(myBaseFreq, myPosition.x, myPosition.y);
-        myOsc.frequency.setTargetAtTime(modFreq, audioCtx.currentTime, 0.08);
-      }
-
-      checkCollision();
-    });
-
-    // ─── Receive other cursors ────────────────────────────────────────
-    socket.on("cursor-update", (data) => {
-      // First time seeing this user
-      if (!otherCursors[data.id]) {
-        const el = createCursorElement(data.color, data.name);
-        const entry = {
-          el,
-          x: 0,
-          y: 0,
-          baseFreq: data.freq,
-          osc: null,
-          gain: null,
-        };
-
-        // Only create oscillator if audio is already running
-        if (audioReady) {
-          const audio = createOscillator(data.freq);
-          entry.osc = audio.osc;
-          entry.gain = audio.gain;
+      /* Collision wiggle animation */
+      @keyframes wiggle {
+        0% {
+          transform: scale(1) rotate(0deg);
         }
 
-        otherCursors[data.id] = entry;
-      }
+        15% {
+          transform: scale(1.4) rotate(-6deg);
+        }
 
-      const c = otherCursors[data.id];
-      c.x = data.x;
-      c.y = data.y;
-      c.el.style.left = c.x + "px";
-      c.el.style.top = c.y + "px";
+        30% {
+          transform: scale(0.9) rotate(6deg);
+        }
 
-      // Modulate their sound with their position
-      if (audioCtx && c.osc) {
-        const modFreq = modulateFreq(c.baseFreq, data.x, data.y);
-        c.osc.frequency.setTargetAtTime(modFreq, audioCtx.currentTime, 0.08);
-      }
+        45% {
+          transform: scale(1.25) rotate(-4deg);
+        }
 
-      checkCollision();
-    });
+        60% {
+          transform: scale(0.95) rotate(3deg);
+        }
 
-    // ─── Collision detection ──────────────────────────────────────────
-    function checkCollision() {
-      const now = Date.now();
+        75% {
+          transform: scale(1.1) rotate(-2deg);
+        }
 
-      for (const id in otherCursors) {
-        const other = otherCursors[id];
-        const lastHit = lastHitByCursor[id] || 0;
-        if (now - lastHit < collisionCooldownMs) continue;
-
-        if (isCollidingWithCursor(myPosition.x, myPosition.y, other)) {
-          lastHitByCursor[id] = now;
-          triggerCollision({ el: myCursorEl });
-          triggerCollision(other);
+        100% {
+          transform: scale(1) rotate(0deg);
         }
       }
-    }
 
-    // ─── User leaves ──────────────────────────────────────────────────
-    socket.on("user-left", (id) => {
-      if (otherCursors[id]) {
-        // Fade out their sound before removing
-        if (audioCtx && otherCursors[id].gain) {
-          const g = otherCursors[id].gain;
-          g.gain.setTargetAtTime(0, audioCtx.currentTime, 0.1);
-          // Stop oscillator after fade
+      .wiggle {
+        animation: wiggle 0.45s ease forwards;
+      }
+
+      /* Click pulse animation for Level 2 */
+      @keyframes clickPulse {
+        0% {
+          transform: scale(0);
+          opacity: 1;
+        }
+        50% {
+          transform: scale(1.5);
+          opacity: 0.7;
+        }
+        100% {
+          transform: scale(2);
+          opacity: 0;
+        }
+      }
+    </style>
+  </head>
+
+  <body>
+    <div id="hero">
+      <h1 id="level-title">Cursor Party</h1>
+      <p id="level-instructions">
+        Click anywhere to enable sound — then go bump into someone!
+      </p>
+    </div>
+
+    <img
+      id="bouncingImage"
+      src="./image/dvd.png"
+      style="
+        position: absolute;
+        width: 290px;
+        z-index: 1000;
+        opacity: 0;
+        display: none;
+      "
+    />
+
+    <script src="/socket.io/socket.io.js"></script>
+
+    <script>
+      const socket = io();
+      const soundFiles = ["sound1.mp3", "sound2.mp3", "sound3.mp3"];
+      const collisionPoolSize = 4;
+      const soundPools = soundFiles.map((file) => {
+        const src = `sound/${file}`;
+        return Array.from({ length: collisionPoolSize }, () => {
+          const audio = new Audio(src);
+          audio.preload = "auto";
+          return audio;
+        });
+      });
+      const backgroundMusic = new Audio();
+      const otherCursors = {};
+      const myPosition = { x: 0, y: 0 };
+
+      // My own identity (received from server)
+      let myColor = null;
+      let myName = null;
+      let myBaseFreq = 220;
+      let myBackgroundTrack = null;
+      let myCursorEl = null;
+
+      // Audio
+      let audioCtx = null;
+      let myOsc = null;
+      let myGain = null;
+      let audioReady = false;
+
+      // Throttle
+      let lastEmit = 0;
+      const collisionCooldownMs = 300;
+      const collisionHitboxSize = 18;
+      const collisionPadding = 10;
+      const lastHitByCursor = {};
+
+      // ─── Receive own identity from server ───────────────────────────
+      socket.on("welcome", (data) => {
+        myColor = data.color;
+        myName = data.name;
+        myBaseFreq = data.freq;
+        myBackgroundTrack = data.backgroundTrack;
+
+        if (myBackgroundTrack) {
+          backgroundMusic.src = `sound/${myBackgroundTrack}`;
+          backgroundMusic.preload = "auto";
+          backgroundMusic.load();
+        }
+
+        if (!myCursorEl) {
+          myCursorEl = createCursorElement(myColor, myName);
+        }
+
+        updateMyCursorPosition();
+      });
+
+      // ─── Receive level updates ──────────────────────────────────────
+      socket.on("level-update", (levelData) => {
+        console.log("Received level-update:", levelData);
+
+        document.getElementById("level-title").textContent = levelData.title;
+        document.getElementById("level-instructions").textContent =
+          levelData.instructions;
+
+        // Handle level 2: Click to expand black area
+        if (levelData.id === 2) {
+          console.log("Level 2 detected, calling initLevel2");
+          initLevel2();
+        } else {
+          console.log("Not level 2, calling cleanupLevel2");
+          cleanupLevel2();
+        }
+      });
+
+      // ─── Audio helpers ───────────────────────────────────────────────
+      function modulateFreq(baseFreq, x, y) {
+        return baseFreq;
+      }
+
+      function createOscillator(freq) {
+        return null;
+      }
+
+      window.addEventListener("click", () => {
+        if (audioReady) return;
+        // Activate AudioContext and preload all sound effects
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        audioReady = true;
+
+        if (myBackgroundTrack) {
+          backgroundMusic.loop = true;
+          backgroundMusic.volume = 0.25;
+          backgroundMusic
+            .play()
+            .catch((e) =>
+              console.error("Background music playback failed:", e),
+            );
+        }
+        soundPools.flat().forEach((sound) => {
+          sound.currentTime = 0;
+          sound.load();
+        });
+
+        const instructions = document.getElementById("instructions");
+        if (instructions)
+          instructions.innerText = "Sound enabled! Go bump into someone!";
+      });
+
+      // ─── Collision effect ─────────────────────────────────────────────
+      function triggerCollision(cursor) {
+        // 1. Visual effect: Keep the original Wiggle animation
+        if (!cursor?.el) return;
+        cursor.el.classList.remove("wiggle");
+        void cursor.el.offsetWidth;
+        cursor.el.classList.add("wiggle");
+        cursor.el.addEventListener(
+          "animationend",
+          () => {
+            cursor.el.classList.remove("wiggle");
+          },
+          { once: true },
+        );
+
+        // 2. Play random MP3 sound effect
+        if (audioReady && soundPools.length > 0) {
+          // Pick a ready-to-play sound instance from the pool to reduce collision delay
+          const randomIndex = Math.floor(Math.random() * soundPools.length);
+          const selectedPool = soundPools[randomIndex];
+          const soundInstance =
+            selectedPool.find((sound) => sound.paused || sound.ended) ||
+            selectedPool[0];
+
+          soundInstance.pause();
+          soundInstance.currentTime = 0;
+          soundInstance.volume = 0.6;
+          soundInstance
+            .play()
+            .catch((e) => console.error("Sound playback failed:", e));
+        }
+      }
+
+      // ─── Build cursor DOM element ─────────────────────────────────────
+      function createCursorElement(color, name) {
+        const wrapper = document.createElement("div");
+        wrapper.classList.add("cursor-wrapper");
+
+        const svg = document.createElementNS(
+          "http://www.w3.org/2000/svg",
+          "svg",
+        );
+        svg.setAttribute("viewBox", "0 0 24 24");
+        svg.setAttribute("width", "24");
+        svg.setAttribute("height", "24");
+
+        const path = document.createElementNS(
+          "http://www.w3.org/2000/svg",
+          "path",
+        );
+        path.setAttribute(
+          "d",
+          "M4 2 L4 18 L8 14 L12 22 L14 21 L10 13 L16 13 Z",
+        );
+        path.setAttribute("fill", color);
+        path.setAttribute("stroke", "white");
+        path.setAttribute("stroke-width", "1.2");
+        path.setAttribute("stroke-linejoin", "round");
+        svg.appendChild(path);
+
+        const label = document.createElement("span");
+        label.classList.add("cursor-label");
+        label.style.color = color;
+        label.innerText = name;
+
+        wrapper.appendChild(svg);
+        wrapper.appendChild(label);
+        document.body.appendChild(wrapper);
+
+        return wrapper;
+      }
+
+      function updateMyCursorPosition() {
+        if (!myCursorEl) return;
+        myCursorEl.style.left = myPosition.x + "px";
+        myCursorEl.style.top = myPosition.y + "px";
+      }
+
+      function isCollidingWithCursor(pointX, pointY, cursor) {
+        if (!cursor?.el) return false;
+
+        const left = cursor.x - collisionPadding;
+        const top = cursor.y - collisionPadding;
+        const right = cursor.x + cursor.el.offsetWidth + collisionPadding;
+        const bottom = cursor.y + cursor.el.offsetHeight + collisionPadding;
+
+        const halfHitbox = collisionHitboxSize / 2;
+        const pointLeft = pointX - halfHitbox;
+        const pointTop = pointY - halfHitbox;
+        const pointRight = pointX + halfHitbox;
+        const pointBottom = pointY + halfHitbox;
+
+        return (
+          pointLeft < right &&
+          pointRight > left &&
+          pointTop < bottom &&
+          pointBottom > top
+        );
+      }
+
+      // ─── Mouse tracking ───────────────────────────────────────────────
+      window.addEventListener("mousemove", (e) => {
+        const now = Date.now();
+        if (now - lastEmit < 16) return;
+        lastEmit = now;
+
+        myPosition.x = e.clientX + window.scrollX;
+        myPosition.y = e.clientY + window.scrollY;
+        updateMyCursorPosition();
+
+        socket.emit("cursor-move", { x: myPosition.x, y: myPosition.y });
+
+        // Modulate my own sound with position
+        if (audioCtx && myOsc) {
+          const modFreq = modulateFreq(myBaseFreq, myPosition.x, myPosition.y);
+          myOsc.frequency.setTargetAtTime(modFreq, audioCtx.currentTime, 0.08);
+        }
+
+        checkCollision();
+      });
+
+      // ─── Receive other cursors ────────────────────────────────────────
+      socket.on("cursor-update", (data) => {
+        // First time seeing this user
+        if (!otherCursors[data.id]) {
+          const el = createCursorElement(data.color, data.name);
+          const entry = {
+            el,
+            x: 0,
+            y: 0,
+            baseFreq: data.freq,
+            osc: null,
+            gain: null,
+          };
+
+          // Only create oscillator if audio is already running
+          if (audioReady) {
+            const audio = createOscillator(data.freq);
+            entry.osc = audio.osc;
+            entry.gain = audio.gain;
+          }
+
+          otherCursors[data.id] = entry;
+        }
+
+        const c = otherCursors[data.id];
+        c.x = data.x;
+        c.y = data.y;
+        c.el.style.left = c.x + "px";
+        c.el.style.top = c.y + "px";
+
+        // Modulate their sound with their position
+        if (audioCtx && c.osc) {
+          const modFreq = modulateFreq(c.baseFreq, data.x, data.y);
+          c.osc.frequency.setTargetAtTime(modFreq, audioCtx.currentTime, 0.08);
+        }
+
+        checkCollision();
+      });
+
+      // ─── Collision detection ──────────────────────────────────────────
+      function checkCollision() {
+        const now = Date.now();
+
+        for (const id in otherCursors) {
+          const other = otherCursors[id];
+          const lastHit = lastHitByCursor[id] || 0;
+          if (now - lastHit < collisionCooldownMs) continue;
+
+          if (isCollidingWithCursor(myPosition.x, myPosition.y, other)) {
+            lastHitByCursor[id] = now;
+            triggerCollision({ el: myCursorEl });
+            triggerCollision(other);
+          }
+        }
+      }
+
+      // ─── User leaves ──────────────────────────────────────────────────
+      socket.on("user-left", (id) => {
+        if (otherCursors[id]) {
+          // Fade out their sound before removing
+          if (audioCtx && otherCursors[id].gain) {
+            const g = otherCursors[id].gain;
+            g.gain.setTargetAtTime(0, audioCtx.currentTime, 0.1);
+            // Stop oscillator after fade
+            setTimeout(() => {
+              try {
+                otherCursors[id].osc.stop();
+              } catch (e) {}
+            }, 500);
+          }
+          otherCursors[id].el.remove();
+          delete otherCursors[id];
+          delete lastHitByCursor[id];
+        }
+      });
+    </script>
+
+    <!-- Level 2: Click to expand black area -->
+    <div
+      id="level2-container"
+      style="
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        z-index: 3000;
+        touch-action: none;
+      "
+    >
+      <div
+        id="white-area"
+        style="
+          position: absolute;
+          top: 0;
+          left: 0;
+          width: 100%;
+          height: 100%;
+          background: #fff;
+          cursor: pointer;
+          -webkit-tap-highlight-color: transparent;
+        "
+      ></div>
+      <div
+        id="black-area"
+        style="
+          position: absolute;
+          top: 50%;
+          left: 50%;
+          width: 100px;
+          height: 100px;
+          background: #000;
+          border-radius: 50%;
+          transform: translate(-50%, -50%);
+          pointer-events: auto;
+          transition: all 0.3s ease;
+          box-shadow: 0 0 20px rgba(0, 0, 0, 0.8);
+        "
+      ></div>
+    </div>
+
+    <script>
+      let level2Active = false;
+      let blackAreaSize = 100; // Initial size in pixels
+      let maxSize = Math.min(window.innerWidth, window.innerHeight) * 1.5; // Max size to cover screen
+      const minBlackAreaSize = 40;
+      const blackAreaStep = 50;
+
+      function initLevel2() {
+        console.log("initLevel2 called");
+
+        // Check if it's a mobile device - temporarily allow desktop for testing
+        const isMobile =
+          /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(
+            navigator.userAgent,
+          ) ||
+          (window.innerWidth <= 768 && window.innerHeight <= 1024);
+
+        console.log("isMobile:", isMobile, "userAgent:", navigator.userAgent, "window size:", window.innerWidth, "x", window.innerHeight);
+
+        // Temporarily allow desktop testing - remove this line for production
+        const allowDesktopTesting = true;
+
+        if (!isMobile && !allowDesktopTesting) {
+          document.getElementById("level-instructions").textContent =
+            "This level is designed for mobile devices only!";
+          return;
+        }
+
+        if (!isMobile && allowDesktopTesting) {
+          document.getElementById("level-instructions").textContent +=
+            " (Desktop testing mode enabled)";
+        }
+
+        level2Active = true;
+        blackAreaSize = 100;
+
+        const container = document.getElementById("level2-container");
+        const whiteArea = document.getElementById("white-area");
+        const blackArea = document.getElementById("black-area");
+
+        console.log("container:", container, "whiteArea:", whiteArea, "blackArea:", blackArea);
+
+        container.style.display = "block";
+        blackArea.style.width = blackAreaSize + "px";
+        blackArea.style.height = blackAreaSize + "px";
+
+        console.log("Level 2 initialized successfully");
+
+        function createClickEffect(x, y) {
+          const clickEffect = document.createElement("div");
+          clickEffect.style.position = "absolute";
+          clickEffect.style.left = x - 25 + "px";
+          clickEffect.style.top = y - 25 + "px";
+          clickEffect.style.width = "50px";
+          clickEffect.style.height = "50px";
+          clickEffect.style.borderRadius = "50%";
+          clickEffect.style.background = "rgba(0, 0, 0, 0.3)";
+          clickEffect.style.pointerEvents = "none";
+          clickEffect.style.animation = "clickPulse 0.5s ease-out forwards";
+          container.appendChild(clickEffect);
+
           setTimeout(() => {
-            try {
-              otherCursors[id].osc.stop();
-            } catch (e) { }
+            if (clickEffect.parentNode) {
+              clickEffect.parentNode.removeChild(clickEffect);
+            }
           }, 500);
         }
-        otherCursors[id].el.remove();
-        delete otherCursors[id];
-        delete lastHitByCursor[id];
+
+        function syncBlackArea() {
+          blackArea.style.width = blackAreaSize + "px";
+          blackArea.style.height = blackAreaSize + "px";
+        }
+
+        whiteArea.onclick = function (e) {
+          console.log("White area clicked");
+          if (!level2Active) return;
+          createClickEffect(e.clientX, e.clientY);
+
+          // Clicking white grows the visible white area by shrinking the black circle.
+          blackAreaSize = Math.max(minBlackAreaSize, blackAreaSize - blackAreaStep);
+          syncBlackArea();
+        };
+
+        blackArea.onclick = function (e) {
+          console.log("Black area clicked");
+          if (!level2Active) return;
+          e.stopPropagation();
+
+          createClickEffect(e.clientX, e.clientY);
+
+          // Clicking black grows the black circle.
+          blackAreaSize += blackAreaStep;
+          syncBlackArea();
+
+          // Check if level is completed
+          if (blackAreaSize >= maxSize) {
+            // Level completed - notify server
+            socket.emit("level-complete");
+            document.getElementById("level-instructions").textContent =
+              "Level completed! Waiting for host to advance...";
+            level2Active = false;
+          }
+        };
       }
-    });
-  </script>
 
+      function cleanupLevel2() {
+        level2Active = false;
+        const container = document.getElementById("level2-container");
+        const whiteArea = document.getElementById("white-area");
+        const blackArea = document.getElementById("black-area");
+        if (container) {
+          container.style.display = "none";
+        }
+        if (whiteArea) {
+          whiteArea.onclick = null;
+        }
+        if (blackArea) {
+          blackArea.onclick = null;
+        }
+      }
 
-
-</body>
-
+      // Handle window resize for mobile
+      window.addEventListener("resize", () => {
+        if (level2Active) {
+          maxSize = Math.min(window.innerWidth, window.innerHeight) * 1.5;
+        }
+      });
+    </script>
+  </body>
 </html>
