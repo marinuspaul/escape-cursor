@@ -110,16 +110,15 @@
 </head>
 
 <body>
-  <!--
   <div id="hero">
-    <h1>Cursor Party</h1>
-    <p id="instructions">
+    <h1 id="level-title">Cursor Party</h1>
+    <p id="level-instructions">
       Click anywhere to enable sound — then go bump into someone!
     </p>
-  </div> -->
+  </div>
 
   <img id="bouncingImage" src="./image/dvd.png"
-    style="position: absolute; width: 290px; z-index: 1000; opacity: 0.3;" />
+    style="position: absolute; width: 290px; z-index: 1000; opacity: 0; display: none;" />
 
   <script src="/socket.io/socket.io.js"></script>
 
@@ -179,6 +178,12 @@
       updateMyCursorPosition();
     });
 
+    // ─── Receive level updates ──────────────────────────────────────
+    socket.on("level-update", (levelData) => {
+      document.getElementById('level-title').textContent = levelData.title;
+      document.getElementById('level-instructions').textContent = levelData.instructions;
+    });
+
     // ─── Audio helpers ───────────────────────────────────────────────
     function modulateFreq(baseFreq, x, y) {
       return baseFreq;
@@ -190,14 +195,14 @@
 
     window.addEventListener("click", () => {
       if (audioReady) return;
-      // 激活 AudioContext 並預載所有音效
+      // Activate AudioContext and preload all sound effects
       audioCtx = new (window.AudioContext || window.webkitAudioContext)();
       audioReady = true;
 
       if (myBackgroundTrack) {
         backgroundMusic.loop = true;
         backgroundMusic.volume = 0.25;
-        backgroundMusic.play().catch(e => console.error("背景音樂播放失敗:", e));
+        backgroundMusic.play().catch(e => console.error("Background music playback failed:", e));
       }
       soundPools.flat().forEach((sound) => {
         sound.currentTime = 0;
@@ -210,7 +215,7 @@
 
     // ─── Collision effect ─────────────────────────────────────────────
     function triggerCollision(cursor) {
-      // 1. 視覺效果：保持原本的 Wiggle 動畫
+      // 1. Visual effect: Keep the original Wiggle animation
       if (!cursor?.el) return;
       cursor.el.classList.remove("wiggle");
       void cursor.el.offsetWidth;
@@ -223,9 +228,9 @@
         { once: true },
       );
 
-      // 2. 隨機播放 MP3 音效
+      // 2. Play random MP3 sound effect
       if (audioReady && soundPools.length > 0) {
-        // 從預載好的 pool 中挑一個可立即播放的音效實例，降低碰撞延遲
+        // Pick a ready-to-play sound instance from the pool to reduce collision delay
         const randomIndex = Math.floor(Math.random() * soundPools.length);
         const selectedPool = soundPools[randomIndex];
         const soundInstance =
@@ -234,7 +239,7 @@
         soundInstance.pause();
         soundInstance.currentTime = 0;
         soundInstance.volume = 0.6;
-        soundInstance.play().catch(e => console.error("音效播放失敗:", e));
+        soundInstance.play().catch(e => console.error("Sound playback failed:", e));
       }
     }
 
@@ -399,59 +404,6 @@
         otherCursors[id].el.remove();
         delete otherCursors[id];
         delete lastHitByCursor[id];
-      }
-    });
-  </script>
-
-
-  <!-- dvd logo control -->
-  <script>
-    const img = document.getElementById('bouncingImage');
-    let posX = Math.random() * (window.innerWidth - 100); // 初始 X 位置
-    let posY = Math.random() * (window.innerHeight - 100); // 初始 Y 位置
-    let velX = 1; // X 軸移動速度
-    let velY = 1; // Y 軸移動速度
-
-    function move() {
-      const imgWidth = img.offsetWidth;
-      const imgHeight = img.offsetHeight;
-
-      // 更新座標
-      posX += velX;
-      posY += velY;
-
-      // 碰撞檢查：左右邊界
-      if (posX + imgWidth >= window.innerWidth || posX <= 0) {
-        velX = -velX; // 反轉方向
-      }
-      // 碰撞檢查：上下邊界
-      if (posY + imgHeight >= window.innerHeight || posY <= 0) {
-        velY = -velY; // 反轉方向
-      }
-
-      // 套用新位置
-      img.style.left = posX + 'px';
-      img.style.top = posY + 'px';
-
-      requestAnimationFrame(move); // 持續循環動畫
-    }
-
-    // 確保圖片載入後開始移動
-    img.onload = () => move();
-    // 如果圖片已經快取，直接啟動
-    if (img.complete) move();
-
-    window.addEventListener('resize', () => {
-      const imgWidth = img.offsetWidth;
-      const imgHeight = img.offsetHeight;
-
-      // 如果圖片位置超過了縮小後的視窗寬度，就把它貼回邊界
-      if (posX + imgWidth > window.innerWidth) {
-        posX = window.innerWidth - imgWidth;
-      }
-      // 如果圖片位置超過了縮小後的視窗高度，就把它貼回邊界
-      if (posY + imgHeight > window.innerHeight) {
-        posY = window.innerHeight - imgHeight;
       }
     });
   </script>

@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Escape Room - Host Control Panel</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #f0f0f0;
+      margin: 0;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    .container {
+      max-width: 600px;
+      background: white;
+      padding: 30px;
+      border-radius: 10px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    }
+    h1 {
+      color: #333;
+      text-align: center;
+    }
+    .level-info {
+      margin: 20px 0;
+      padding: 15px;
+      background: #e8f4fd;
+      border-radius: 5px;
+      border-left: 4px solid #2196F3;
+    }
+    .controls {
+      display: flex;
+      gap: 10px;
+      justify-content: center;
+      margin-top: 20px;
+    }
+    button {
+      padding: 12px 24px;
+      font-size: 16px;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      transition: background 0.3s;
+    }
+    .next-btn {
+      background: #4CAF50;
+      color: white;
+    }
+    .next-btn:hover {
+      background: #45a049;
+    }
+    .reset-btn {
+      background: #f44336;
+      color: white;
+    }
+    .reset-btn:hover {
+      background: #da190b;
+    }
+    .status {
+      margin-top: 20px;
+      text-align: center;
+      color: #666;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Escape Room - Host Control Panel</h1>
+
+    <div class="level-info">
+      <h3 id="level-title">Loading...</h3>
+      <p id="level-instructions">Loading...</p>
+    </div>
+
+    <div class="controls">
+      <button class="next-btn" onclick="nextLevel()">Next Level</button>
+      <button class="reset-btn" onclick="resetGame()">Reset Game</button>
+    </div>
+
+    <div class="status">
+      <p>Connection Status: <span id="status">Connecting...</span></p>
+      <p>Current Level: <span id="current-level">0</span></p>
+    </div>
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script>
+    let socket = null;
+    let currentLevelData = null;
+    let connectionAttempts = 0;
+    const maxAttempts = 5;
+
+    // Initialize Socket.IO connection
+    function initSocket() {
+      if (typeof io === 'undefined') {
+        connectionAttempts++;
+        if (connectionAttempts <= maxAttempts) {
+          console.log(`Waiting for Socket.IO to load... (Attempt ${connectionAttempts}/${maxAttempts})`);
+          setTimeout(initSocket, 500);
+        } else {
+          document.getElementById('status').textContent = 'Connection failed: Could not load Socket.IO';
+          document.getElementById('status').style.color = 'red';
+          alert('❌ Error: Unable to connect to server\n\nPlease ensure:\n1. Node.js server is running (node index.js)\n2. Access via correct address: http://localhost:8080/host\n3. Do not use Live Server');
+        }
+        return;
+      }
+
+      socket = io();
+
+      socket.on('connect', () => {
+        console.log('Connected to server');
+        document.getElementById('status').textContent = 'Connected';
+        document.getElementById('status').style.color = 'green';
+      });
+
+      socket.on('disconnect', () => {
+        console.log('Disconnected');
+        document.getElementById('status').textContent = 'Disconnected';
+        document.getElementById('status').style.color = 'red';
+      });
+
+      socket.on('level-update', (levelData) => {
+        currentLevelData = levelData;
+        document.getElementById('level-title').textContent = levelData.title;
+        document.getElementById('level-instructions').textContent = levelData.instructions;
+        document.getElementById('current-level').textContent = levelData.id;
+      });
+
+      socket.on('error', (error) => {
+        console.error('Socket error:', error);
+        document.getElementById('status').textContent = 'Connection error';
+        document.getElementById('status').style.color = 'red';
+      });
+    }
+
+    function nextLevel() {
+      if (!socket) {
+        alert('❌ Not connected to server yet');
+        return;
+      }
+      socket.emit('next-level');
+      console.log('Sent: Next level');
+    }
+
+    function resetGame() {
+      if (!socket) {
+        alert('❌ Not connected to server yet');
+        return;
+      }
+      socket.emit('reset-game');
+      console.log('Sent: Reset game');
+    }
+
+    // Initialize Socket.IO connection when page loads
+    window.addEventListener('DOMContentLoaded', initSocket);
+  </script>
+</body>
+</html></content>
+<parameter name="filePath">/Users/huangyize/Desktop/MADtech/code/escape-cursor/public/host.html

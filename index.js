@@ -12,6 +12,39 @@ app.use(express.static("public"));
 
 app.get('/', (req, res) => { console.log('Health check request received'); res.status(200).send('OK'); });
 
+// Level system
+let currentLevel = 0;
+const levels = [
+  {
+    id: 0,
+    title: "Welcome to Escape Room",
+    instructions: "All players: Move your cursor to the center of the screen and get ready!",
+    completed: false
+  },
+  {
+    id: 1,
+    title: "Level 1: Cursor Collision",
+    instructions: "Make all players' cursors collide at least once!",
+    completed: false
+  },
+  {
+    id: 2,
+    title: "Level 2: Cursor Dance",
+    instructions: "Move your cursor in circles around the screen!",
+    completed: false
+  },
+  {
+    id: 3,
+    title: "Congratulations!",
+    instructions: "You've successfully escaped the room!",
+    completed: true
+  }
+];
+
+app.get('/host', (req, res) => {
+  res.sendFile(__dirname + '/public/host.html');
+});
+
 const adjectives = [
   "Sleepy",
   "Grumpy",
@@ -87,6 +120,9 @@ io.on("connection", (socket) => {
     backgroundTrack: userBackgroundTrack,
   });
 
+  // Send current level to new user
+  socket.emit("level-update", levels[currentLevel]);
+
   // Broadcast cursor movement to everyone else
   socket.on("cursor-move", (data) => {
     socket.broadcast.emit("cursor-update", {
@@ -97,6 +133,21 @@ io.on("connection", (socket) => {
       name: userName,
       freq: userFreq,
     });
+  });
+
+  // Host controls
+  socket.on("next-level", () => {
+    if (currentLevel < levels.length - 1) {
+      currentLevel++;
+      io.emit("level-update", levels[currentLevel]);
+      console.log(`Advanced to level ${currentLevel}`);
+    }
+  });
+
+  socket.on("reset-game", () => {
+    currentLevel = 0;
+    io.emit("level-update", levels[currentLevel]);
+    console.log("Game reset to level 0");
   });
 
   socket.on("disconnect", () => {
