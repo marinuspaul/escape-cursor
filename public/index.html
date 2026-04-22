@@ -96,6 +96,18 @@
         z-index: 3000;
       }
 
+      #trigger-point {
+        width: 50px;
+        height: 50px;
+        border-radius: 50%;
+        position: absolute;
+        background-color: lime;
+        transform: translate(-50%, -50%);
+        z-index: 3;
+        top: 80%;
+        left: 70%;
+      }
+
       /* Cursor styles */
       .cursor-circle {
         width: 20px;
@@ -164,6 +176,7 @@
       let myCursorEl = null;
 
       let averageCursorEl = document.getElementById("average-cursor");
+      let triggerPointEl = document.getElementById("trigger-point");
 
       let myCursorLocal = {
         x: 0,
@@ -223,6 +236,9 @@
 
         // Check for collisions
         checkCollision();
+
+        // Check if average position collides with trigger point
+        checkTriggerCollision();
 
         // Continue the loop
         animationFrameId = requestAnimationFrame(gameLoop);
@@ -410,7 +426,7 @@
           }
 
           // Prevent default to avoid scrolling
-          // e.preventDefault();
+          e.preventDefault();
 
           updateMyCursorPosition(
             e.clientX + touch.clientX,
@@ -426,7 +442,7 @@
           (t) => t.identifier === activeTouchId,
         );
         if (touch) {
-          // e.preventDefault(); // Prevent scrolling
+          e.preventDefault(); // Prevent scrolling
           updateMyCursorPosition(touch.clientX, touch.clientY);
         }
       }
@@ -574,6 +590,78 @@
             triggerCollision(other);
           }
         }
+      }
+
+      // ─── Check trigger collision ──────────────────────────────────────
+      function checkTriggerCollision() {
+        if (!triggerPointEl || !averagePos) return;
+
+        // Get trigger point position and dimensions
+        const triggerRect = triggerPointEl.getBoundingClientRect();
+        const triggerX = triggerRect.left + triggerRect.width / 2;
+        const triggerY = triggerRect.top + triggerRect.height / 2;
+        const triggerRadius = triggerRect.width / 2;
+
+        // Calculate distance between average position and trigger point
+        const dx = averagePos.x - triggerX;
+        const dy = averagePos.y - triggerY;
+        const distance = Math.sqrt(dx * dx + dy * dy);
+
+        // Check if average position is within trigger point radius
+        const collisionThreshold = triggerRadius + 10; // Add some padding
+        if (distance < collisionThreshold) {
+          triggerPointCollision();
+        }
+      }
+
+      function triggerPointCollision() {
+        console.log("Average position collided with trigger point!");
+
+        // Play collision sound
+        if (audioReady && soundPools.length > 0) {
+          const randomIndex = Math.floor(Math.random() * soundPools.length);
+          const selectedPool = soundPools[randomIndex];
+          const soundInstance = selectedPool[0];
+
+          soundInstance.pause();
+          soundInstance.currentTime = 0;
+          soundInstance.volume = 0.8;
+          soundInstance
+            .play()
+            .catch((e) => console.error("Trigger sound playback failed:", e));
+        }
+
+        // Move trigger point to a new random position after collision
+        moveTriggerPointToRandomPosition();
+      }
+
+      function moveTriggerPointToRandomPosition() {
+        // Get screen dimensions
+        const screenWidth = window.innerWidth;
+        const screenHeight = window.innerHeight;
+
+        // Ensure trigger point stays within visible area with some margin
+        const margin = 200;
+        const minX = margin;
+        const minY = margin;
+        const maxX = screenWidth - margin;
+        const maxY = screenHeight - margin;
+
+        // Generate random position within bounds
+        const randomX = Math.floor(Math.random() * (maxX - minX)) + minX;
+        const randomY = Math.floor(Math.random() * (maxY - minY)) + minY;
+
+        // Convert to percentage for consistent positioning across screen sizes
+        const xPercent = (randomX / screenWidth) * 100;
+        const yPercent = (randomY / screenHeight) * 100;
+
+        console.log(
+          `Moving trigger point to: (${xPercent.toFixed(1)}%, ${yPercent.toFixed(1)}%)`,
+        );
+
+        // Apply the new position immediately (no animations as requested)
+        triggerPointEl.style.left = xPercent + "%";
+        triggerPointEl.style.top = yPercent + "%";
       }
 
       // ─── User leaves ──────────────────────────────────────────────────
