@@ -42,6 +42,7 @@
       }
 
       .cursor-wrapper {
+        /*display: none;*/
         position: absolute;
         pointer-events: none;
         top: 0;
@@ -96,8 +97,21 @@
         z-index: 3000;
       }
 
+      #trigger-point {
+        width: 50px;
+        height: 50px;
+        border-radius: 50%;
+        position: absolute;
+        background-color: lime;
+        transform: translate(-50%, -50%);
+        z-index: 3;
+        top: 80%;
+        left: 70%;
+      }
+
       /* Cursor styles */
       .cursor-circle {
+        opacity: 30%;
         width: 20px;
         height: 20px;
         border-radius: 50%;
@@ -137,6 +151,7 @@
     <div id="hero"></div>
 
     <div id="average-cursor"></div>
+    <div id="trigger-point"></div>
 
     <script src="/socket.io/socket.io.js"></script>
 
@@ -162,7 +177,12 @@
       let myBackgroundTrack = null;
       let myCursorEl = null;
 
-let averageCursorEl = document.getElementById("average-cursor");
+      // Trigger point state for host version
+      let triggerCatchCount = 0;
+      const MAX_TRIGGER_CATCHES = 5;
+      let triggerPointEl = document.getElementById("trigger-point");
+
+      let averageCursorEl = document.getElementById("average-cursor");
 
       let myCursorLocal = {
         x: 0,
@@ -196,6 +216,7 @@ let averageCursorEl = document.getElementById("average-cursor");
         myColor = data.color;
         myBaseFreq = data.freq;
         myBackgroundTrack = data.backgroundTrack;
+        const isHost = data.isHost || false;
 
         if (myBackgroundTrack) {
           backgroundMusic.src = `sound/${myBackgroundTrack}`;
@@ -203,13 +224,14 @@ let averageCursorEl = document.getElementById("average-cursor");
           backgroundMusic.load();
         }
 
-        if (!myCursorEl) {
-          myCursorEl = createCursorElement(myColor, false);
-          myCursorEl.classList.add("own-cursor");
-        }
+        // Host version doesn't render self-cursor or broadcast movements
+        if (!isHost && !myCursorEl) {
+          // myCursorEl = createCursorElement(myColor, false);
+          // myCursorEl.classList.add("own-cursor");
 
-        // Initialize at center position (50%)
-        updateMyCursorPosition(window.innerWidth / 2, window.innerHeight / 2);
+          // Initialize at center position (50%)
+          updateMyCursorPosition(window.innerWidth / 2, window.innerHeight / 2);
+        }
       });
 
       // ─── Game Loop ──────────────────────────────────────────────────
@@ -219,9 +241,12 @@ let averageCursorEl = document.getElementById("average-cursor");
 
         // Calculate average position
         calculateAverage();
+        // console.log(otherCursors);
+        // Check for collisions
+        checkCollision();
 
-         // Check for collisions
-         checkCollision();
+        // Check if average position collides with trigger point
+        checkTriggerCollision();
 
         // Continue the loop
         animationFrameId = requestAnimationFrame(gameLoop);
@@ -366,98 +391,9 @@ let averageCursorEl = document.getElementById("average-cursor");
       }
 
       // ─── Mouse tracking ───────────────────────────────────────────────
-      window.addEventListener("mousedown", () => {
-        isMouseDown = true;
-        console.log("Mouse down - active state");
-        if (myCursorEl) {
-          myCursorEl.classList.add("active-state");
-        }
-        myCursorLocal.isActive = true;
-        emitMyCursorState();
-      });
-
-      window.addEventListener("mouseup", () => {
-        isMouseDown = false;
-        console.log("Mouse up - inactive state");
-        if (myCursorEl) {
-          myCursorEl.classList.remove("active-state");
-        }
-        myCursorLocal.isActive = false;
-        emitMyCursorState();
-      });
-
-      window.addEventListener("mousemove", (e) => {
-        updateMyCursorPosition(
-          e.clientX + window.scrollX,
-          e.clientY + window.scrollY,
-        );
-      });
-
-      // ─── Touch tracking for mobile devices ────────────────────────────
-      function handleTouchStart(e) {
-        console.log("Touch start detected, touches:", e.touches.length);
-        if (e.touches.length === 1 && !activeTouchId) {
-          const touch = e.touches[0];
-          activeTouchId = touch.identifier;
-          myCursorLocal.isTouching = true;
-
-          console.log("Starting touch with ID:", activeTouchId);
-
-          if (myCursorEl) {
-            myCursorEl.classList.add("touch-active");
-            myCursorEl.classList.add("active-state");
-          }
-
-          // Prevent default to avoid scrolling
-          e.preventDefault();
-
-          updateMyCursorPosition(
-            e.clientX + touch.clientX,
-            e.clientY + touch.clientY,
-          );
-        }
-      }
-
-      function handleTouchMove(e) {
-        if (!activeTouchId) return;
-
-        const touch = Array.from(e.touches).find(
-          (t) => t.identifier === activeTouchId,
-        );
-        if (touch) {
-          e.preventDefault(); // Prevent scrolling
-          updateMyCursorPosition(touch.clientX, touch.clientY);
-        }
-      }
-
-      function handleTouchEnd(e) {
-        if (activeTouchId) {
-          const touch = Array.from(e.changedTouches).find(
-            (t) => t.identifier === activeTouchId,
-          );
-          if (touch) {
-            myBackgroundTrack = false;
-            activeTouchId = null;
-            myCursorLocal.isTouching = false;
-
-            if (myCursorEl) {
-              myCursorEl.classList.remove("touch-active");
-              myCursorEl.classList.remove("active-state");
-            }
-            emitMyCursorState();
-          }
-        }
-      }
-
-      // Add touch event listeners with passive: false to allow preventDefault
-      window.addEventListener("touchstart", handleTouchStart, {
-        passive: false,
-      });
-      window.addEventListener("touchmove", handleTouchMove, { passive: false });
-      window.addEventListener("touchend", handleTouchEnd, { passive: false });
-      window.addEventListener("touchcancel", handleTouchEnd, {
-        passive: false,
-      });
+      // ─── Host version doesn't handle mouse/touch input ────────────
+      // Host only displays other cursors and manages trigger point
+      // All input handling removed for host version
 
       // ─── Receive other cursors ────────────────────────────────────────
       socket.on("cursor-update", (data) => {
@@ -526,9 +462,9 @@ let averageCursorEl = document.getElementById("average-cursor");
         const myX = (myCursorLocal.x / 100) * screenWidth;
         const myY = (myCursorLocal.y / 100) * screenHeight;
 
-        let xSum = myX;
-        let ySum = myY;
-        let activeCursorCount = 1; // Start with 1 for our own cursor
+        let xSum = 0;
+        let ySum = 0;
+        let activeCursorCount = 0; // Start with 1 for our own cursor
 
         const otherCursorsArray = Object.values(otherCursors);
         otherCursorsArray.forEach((cursor) => {
@@ -573,6 +509,93 @@ let averageCursorEl = document.getElementById("average-cursor");
             triggerCollision(other);
           }
         }
+      }
+
+      // ─── Check trigger collision ──────────────────────────────────────
+      function checkTriggerCollision() {
+        if (!triggerPointEl || !averagePos) return;
+
+        // Get trigger point position and dimensions
+        const triggerRect = triggerPointEl.getBoundingClientRect();
+        const triggerX = triggerRect.left + triggerRect.width / 2;
+        const triggerY = triggerRect.top + triggerRect.height / 2;
+        const triggerRadius = triggerRect.width / 2;
+
+        // Calculate distance between average position and trigger point
+        const dx = averagePos.x - triggerX;
+        const dy = averagePos.y - triggerY;
+        const distance = Math.sqrt(dx * dx + dy * dy);
+
+        // Check if average position is within trigger point radius
+        const collisionThreshold = triggerRadius + 10; // Add some padding
+        if (distance < collisionThreshold) {
+          triggerPointCollision();
+        }
+      }
+
+      function triggerPointCollision() {
+        console.log("Average position collided with trigger point!");
+
+        // Increment catch counter
+        triggerCatchCount++;
+        console.log(
+          `Trigger caught ${triggerCatchCount}/${MAX_TRIGGER_CATCHES} times`,
+        );
+
+        // Play collision sound
+        if (audioReady && soundPools.length > 0) {
+          const randomIndex = Math.floor(Math.random() * soundPools.length);
+          const selectedPool = soundPools[randomIndex];
+          const soundInstance = selectedPool[0];
+
+          soundInstance.pause();
+          soundInstance.currentTime = 0;
+          soundInstance.volume = 0.8;
+          soundInstance
+            .play()
+            .catch((e) => console.error("Trigger sound playback failed:", e));
+        }
+
+        // Check if we've reached the maximum catches
+        if (triggerCatchCount >= MAX_TRIGGER_CATCHES) {
+          console.log("Maximum trigger catches reached! Hiding trigger point.");
+          if (triggerPointEl) {
+            triggerPointEl.style.display = "none";
+          }
+          return; // Don't move to new position
+        }
+
+        // Move trigger point to a new random position after collision
+        moveTriggerPointToRandomPosition();
+      }
+
+      function moveTriggerPointToRandomPosition() {
+        // Get screen dimensions
+        const screenWidth = window.innerWidth;
+        const screenHeight = window.innerHeight;
+
+        // Ensure trigger point stays within visible area with some margin
+        const margin = 200;
+        const minX = margin;
+        const minY = margin;
+        const maxX = screenWidth - margin;
+        const maxY = screenHeight - margin;
+
+        // Generate random position within bounds
+        const randomX = Math.floor(Math.random() * (maxX - minX)) + minX;
+        const randomY = Math.floor(Math.random() * (maxY - minY)) + minY;
+
+        // Convert to percentage for consistent positioning across screen sizes
+        const xPercent = (randomX / screenWidth) * 100;
+        const yPercent = (randomY / screenHeight) * 100;
+
+        console.log(
+          `Moving trigger point to: (${xPercent.toFixed(1)}%, ${yPercent.toFixed(1)}%)`,
+        );
+
+        // Apply the new position immediately (no animations as requested)
+        triggerPointEl.style.left = xPercent + "%";
+        triggerPointEl.style.top = yPercent + "%";
       }
 
       // ─── User leaves ──────────────────────────────────────────────────
