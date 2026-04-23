@@ -1,7 +1,7 @@
 <!doctype html>
 <html>
   <head>
-    <title>ESCAPE</title>
+    <title>DANCE PARTY</title>
     <link
       href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400&display=swap"
       rel="stylesheet"
@@ -16,10 +16,13 @@
 
       html,
       body {
-        font-family: "Inter", sans-serif;
+        font-family: sans-serif;
         background: #000;
+        color: white;
         cursor: none;
         overflow: hidden;
+        margin: 0;
+        padding: 0;
       }
 
       #hero {
@@ -28,17 +31,20 @@
         align-items: center;
         justify-content: center;
         height: 100vh;
+        width: 100vw;
+        overflow: hidden;
         gap: 16px;
+        font-size: 2rem;
         pointer-events: none;
       }
 
       h1 {
-        font-size: 48px;
-        font-weight: 300;
+        font-weight: 800;
+        text-align: center;
         letter-spacing: 6px;
         text-transform: uppercase;
-        opacity: 0.5;
-        color: #000;
+        max-width: 80%;
+        margin: 0;
       }
 
       .cursor-wrapper {
@@ -86,16 +92,6 @@
         animation: wiggle 0.45s ease forwards;
       }
 
-      #average-cursor {
-        width: 12px;
-        height: 12px;
-        border-radius: 50%;
-        position: absolute;
-        background-color: fuchsia;
-        transform: translate(-50%, -50%);
-        z-index: 3000;
-      }
-
       /* Cursor styles */
       .cursor-circle {
         width: 20px;
@@ -134,9 +130,11 @@
   </head>
 
   <body>
-    <div id="hero"></div>
-
-    <div id="average-cursor"></div>
+    <div id="hero">
+      <h1>
+        Drag on screen to move. Look at the projection and dance together!
+      </h1>
+    </div>
 
     <script src="/socket.io/socket.io.js"></script>
 
@@ -162,7 +160,7 @@
       let myBackgroundTrack = null;
       let myCursorEl = null;
 
-let averageCursorEl = document.getElementById("average-cursor");
+      let averageCursorEl = document.getElementById("average-cursor");
 
       let myCursorLocal = {
         x: 0,
@@ -218,10 +216,10 @@ let averageCursorEl = document.getElementById("average-cursor");
         lastUpdateTime = timestamp;
 
         // Calculate average position
-        calculateAverage();
+        // calculateAverage();
 
-         // Check for collisions
-         checkCollision();
+        // Check for collisions
+        // checkCollision();
 
         // Continue the loop
         animationFrameId = requestAnimationFrame(gameLoop);
@@ -242,13 +240,13 @@ let averageCursorEl = document.getElementById("average-cursor");
         audioCtx = new (window.AudioContext || window.webkitAudioContext)();
         audioReady = true;
 
-        if (myBackgroundTrack) {
-          backgroundMusic.loop = true;
-          backgroundMusic.volume = 0.25;
-          backgroundMusic
-            .play()
-            .catch((e) => console.error("背景音樂播放失敗:", e));
-        }
+        // if (myBackgroundTrack) {
+        //   backgroundMusic.loop = true;
+        //   backgroundMusic.volume = 0.25;
+        //   backgroundMusic
+        //     .play()
+        //     .catch((e) => console.error("背景音樂播放失敗:", e));
+        // }
         soundPools.flat().forEach((sound) => {
           sound.currentTime = 0;
           sound.load();
@@ -261,41 +259,10 @@ let averageCursorEl = document.getElementById("average-cursor");
 
       // 支援電腦滑鼠點擊
       window.addEventListener("click", initializeAudio);
-      
+
       // 支援手機觸摸 (iOS 和 Android)
       window.addEventListener("touchstart", initializeAudio, { passive: true });
       window.addEventListener("touchmove", initializeAudio, { passive: true });
-
-      // ─── Collision effect ─────────────────────────────────────────────
-      function triggerCollision(cursor) {
-        // 1. 視覺效果：保持原本的 Wiggle 動畫
-        if (!cursor?.el) return;
-        cursor.el.classList.remove("wiggle");
-        void cursor.el.offsetWidth;
-        cursor.el.classList.add("wiggle");
-        cursor.el.addEventListener(
-          "animationend",
-          () => {
-            cursor.el.classList.remove("wiggle");
-          },
-          { once: true },
-        );
-
-        // 2. 隨機播放 MP3 音效
-        if (audioReady && soundPools.length > 0) {
-          // 從預載好的 pool 中挑一個可立即播放的音效實例，降低碰撞延遲
-          const randomIndex = Math.floor(Math.random() * soundPools.length);
-          const selectedPool = soundPools[randomIndex];
-          const soundInstance =
-            selectedPool.find((sound) => sound.paused || sound.ended) ||
-            selectedPool[0];
-
-          soundInstance.pause();
-          soundInstance.currentTime = 0;
-          soundInstance.volume = 0.6;
-          soundInstance.play().catch((e) => console.error("音效播放失敗:", e));
-        }
-      }
 
       // ─── Build cursor DOM element ─────────────────────────────────────
       function createCursorElement(color, isTouch) {
@@ -311,28 +278,6 @@ let averageCursorEl = document.getElementById("average-cursor");
         document.body.appendChild(cursor);
 
         return cursor;
-      }
-
-      function isCollidingWithCursor(pointX, pointY, cursor) {
-        if (!cursor?.el) return false;
-
-        const left = cursor.x - collisionPadding;
-        const top = cursor.y - collisionPadding;
-        const right = cursor.x + cursor.el.offsetWidth + collisionPadding;
-        const bottom = cursor.y + cursor.el.offsetHeight + collisionPadding;
-
-        const halfHitbox = collisionHitboxSize / 2;
-        const pointLeft = pointX - halfHitbox;
-        const pointTop = pointY - halfHitbox;
-        const pointRight = pointX + halfHitbox;
-        const pointBottom = pointY + halfHitbox;
-
-        return (
-          pointLeft < right &&
-          pointRight > left &&
-          pointTop < bottom &&
-          pointBottom > top
-        );
       }
 
       function emitMyCursorState() {
@@ -464,142 +409,6 @@ let averageCursorEl = document.getElementById("average-cursor");
       window.addEventListener("touchend", handleTouchEnd, { passive: false });
       window.addEventListener("touchcancel", handleTouchEnd, {
         passive: false,
-      });
-
-      // ─── Receive other cursors ────────────────────────────────────────
-      socket.on("cursor-update", (data) => {
-        // console.log(
-        //   "Received cursor update with touch state:",
-        //   data.isTouching,
-        // );
-
-        // First time seeing this user
-        if (!otherCursors[data.id]) {
-          const el = createCursorElement(data.color, data.isTouching);
-          const entry = {
-            el,
-            x: 0,
-            y: 0,
-            baseFreq: data.freq,
-            osc: null,
-            gain: null,
-            isTouching: false,
-            isActive: false,
-          };
-
-          otherCursors[data.id] = entry;
-        }
-
-        const c = otherCursors[data.id];
-        // Convert percentage positions back to absolute positions
-        const screenWidth = window.innerWidth;
-        const screenHeight = window.innerHeight;
-        c.x = (data.x / 100) * screenWidth;
-        c.y = (data.y / 100) * screenHeight;
-        c.isTouching = data.isTouching || false;
-        c.isActive = data.isActive || false;
-        c.el.style.left = c.x + "px";
-        c.el.style.top = c.y + "px";
-
-        // Update cursor classes based on active state
-        const circle = c.el.querySelector(".cursor-circle");
-        if (circle) {
-          if (c.isActive || c.isTouching) {
-            c.el.classList.add("active-state");
-          } else {
-            c.el.classList.remove("active-state");
-          }
-        }
-
-        // Add visual indicator for touch state
-        if (c.isTouching) {
-          c.el.classList.add("touch-active");
-          c.el.style.display = "block";
-        } else {
-          c.el.classList.remove("touch-active");
-        }
-
-        // Modulate their sound with their position
-        if (audioCtx && c.osc) {
-          const modFreq = modulateFreq(c.baseFreq, c.x, c.y);
-          c.osc.frequency.setTargetAtTime(modFreq, audioCtx.currentTime, 0.08);
-        }
-      });
-
-      function calculateAverage() {
-        // Convert our own percentage position to absolute for calculation
-        const screenWidth = window.innerWidth;
-        const screenHeight = window.innerHeight;
-        const myX = (myCursorLocal.x / 100) * screenWidth;
-        const myY = (myCursorLocal.y / 100) * screenHeight;
-
-        let xSum = myX;
-        let ySum = myY;
-        let activeCursorCount = 1; // Start with 1 for our own cursor
-
-        const otherCursorsArray = Object.values(otherCursors);
-        otherCursorsArray.forEach((cursor) => {
-          // Only include cursors that are actively touching (for touch devices)
-          // or always include non-touch cursors
-          if (
-            !cursor.el.classList.contains("touch-cursor") ||
-            cursor.isTouching
-          ) {
-            xSum += cursor.x;
-            ySum += cursor.y;
-            activeCursorCount++;
-          }
-        });
-
-        if (activeCursorCount > 0) {
-          averagePos.x = xSum / activeCursorCount;
-          averagePos.y = ySum / activeCursorCount;
-          averageCursorEl.style.left = averagePos.x + "px";
-          averageCursorEl.style.top = averagePos.y + "px";
-        }
-      }
-
-      // ─── Collision detection ──────────────────────────────────────────
-      function checkCollision() {
-        const now = Date.now();
-
-        // Convert our own percentage position to absolute for collision detection
-        const screenWidth = window.innerWidth;
-        const screenHeight = window.innerHeight;
-        const myX = (myCursorLocal.x / 100) * screenWidth;
-        const myY = (myCursorLocal.y / 100) * screenHeight;
-
-        for (const id in otherCursors) {
-          const other = otherCursors[id];
-          const lastHit = lastHitByCursor[id] || 0;
-          if (now - lastHit < collisionCooldownMs) continue;
-
-          if (isCollidingWithCursor(myX, myY, other)) {
-            lastHitByCursor[id] = now;
-            triggerCollision({ el: myCursorEl });
-            triggerCollision(other);
-          }
-        }
-      }
-
-      // ─── User leaves ──────────────────────────────────────────────────
-      socket.on("user-left", (id) => {
-        if (otherCursors[id]) {
-          // Fade out their sound before removing
-          if (audioCtx && otherCursors[id].gain) {
-            const g = otherCursors[id].gain;
-            g.gain.setTargetAtTime(0, audioCtx.currentTime, 0.1);
-            // Stop oscillator after fade
-            setTimeout(() => {
-              try {
-                otherCursors[id].osc.stop();
-              } catch (e) {}
-            }, 500);
-          }
-          otherCursors[id].el.remove();
-          delete otherCursors[id];
-          delete lastHitByCursor[id];
-        }
       });
 
       // Cleanup on page unload

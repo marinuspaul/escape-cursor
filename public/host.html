@@ -168,7 +168,7 @@
         });
       });
       const backgroundMusic = new Audio();
-      const otherCursors = {};
+      const allCursors = {};
       const averagePos = { x: 0, y: 0 };
 
       // My own identity (received from server)
@@ -209,7 +209,7 @@
       const collisionCooldownMs = 300;
       const collisionHitboxSize = 18;
       const collisionPadding = 10;
-      const lastHitByCursor = {};
+      const lastHitOfCursor = {};
 
       // ─── Receive own identity from server ───────────────────────────
       socket.on("welcome", (data) => {
@@ -218,11 +218,11 @@
         myBackgroundTrack = data.backgroundTrack;
         const isHost = data.isHost || false;
 
-        if (myBackgroundTrack) {
-          backgroundMusic.src = `sound/${myBackgroundTrack}`;
-          backgroundMusic.preload = "auto";
-          backgroundMusic.load();
-        }
+        // if (myBackgroundTrack) {
+        //   backgroundMusic.src = `sound/${myBackgroundTrack}`;
+        //   backgroundMusic.preload = "auto";
+        //   backgroundMusic.load();
+        // }
 
         // Host version doesn't render self-cursor or broadcast movements
         if (!isHost && !myCursorEl) {
@@ -241,7 +241,7 @@
 
         // Calculate average position
         calculateAverage();
-        // console.log(otherCursors);
+        // console.log(allCursors);
         // Check for collisions
         checkCollision();
 
@@ -333,11 +333,13 @@
 
       function isCollidingWithCursor(pointX, pointY, cursor) {
         if (!cursor?.el) return false;
+        const cursorXAbs = (cursor.x / 100) * window.innerWidth;
+        const cursorYAbs = (cursor.y / 100) * window.innerHeight;
 
-        const left = cursor.x - collisionPadding;
-        const top = cursor.y - collisionPadding;
-        const right = cursor.x + cursor.el.offsetWidth + collisionPadding;
-        const bottom = cursor.y + cursor.el.offsetHeight + collisionPadding;
+        const left = cursorXAbs - collisionPadding;
+        const top = cursorYAbs - collisionPadding;
+        const right = cursorXAbs + cursor.el.offsetWidth + collisionPadding;
+        const bottom = cursorYAbs + cursor.el.offsetHeight + collisionPadding;
 
         const halfHitbox = collisionHitboxSize / 2;
         const pointLeft = pointX - halfHitbox;
@@ -403,7 +405,7 @@
         // );
 
         // First time seeing this user
-        if (!otherCursors[data.id]) {
+        if (!allCursors[data.id]) {
           const el = createCursorElement(data.color, data.isTouching);
           const entry = {
             el,
@@ -416,19 +418,22 @@
             isActive: false,
           };
 
-          otherCursors[data.id] = entry;
+          allCursors[data.id] = entry;
         }
 
-        const c = otherCursors[data.id];
+        const c = allCursors[data.id];
+
         // Convert percentage positions back to absolute positions
         const screenWidth = window.innerWidth;
         const screenHeight = window.innerHeight;
-        c.x = (data.x / 100) * screenWidth;
-        c.y = (data.y / 100) * screenHeight;
+        c.x = data.x;
+        c.y = data.y;
+        cAbsX = (data.x / 100) * screenWidth;
+        cAbsY = (data.y / 100) * screenHeight;
         c.isTouching = data.isTouching || false;
         c.isActive = data.isActive || false;
-        c.el.style.left = c.x + "px";
-        c.el.style.top = c.y + "px";
+        c.el.style.left = cAbsX + "px";
+        c.el.style.top = cAbsY + "px";
 
         // Update cursor classes based on active state
         const circle = c.el.querySelector(".cursor-circle");
@@ -459,26 +464,24 @@
         // Convert our own percentage position to absolute for calculation
         const screenWidth = window.innerWidth;
         const screenHeight = window.innerHeight;
-        const myX = (myCursorLocal.x / 100) * screenWidth;
-        const myY = (myCursorLocal.y / 100) * screenHeight;
 
         let xSum = 0;
         let ySum = 0;
         let activeCursorCount = 0; // Start with 1 for our own cursor
 
-        const otherCursorsArray = Object.values(otherCursors);
-        otherCursorsArray.forEach((cursor) => {
+        for (const id in allCursors) {
+          const cursor = allCursors[id];
           // Only include cursors that are actively touching (for touch devices)
           // or always include non-touch cursors
           if (
             !cursor.el.classList.contains("touch-cursor") ||
             cursor.isTouching
           ) {
-            xSum += cursor.x;
-            ySum += cursor.y;
+            xSum += (cursor.x / 100) * screenWidth;
+            ySum += (cursor.y / 100) * screenHeight;
             activeCursorCount++;
           }
-        });
+        }
 
         if (activeCursorCount > 0) {
           averagePos.x = xSum / activeCursorCount;
@@ -495,18 +498,24 @@
         // Convert our own percentage position to absolute for collision detection
         const screenWidth = window.innerWidth;
         const screenHeight = window.innerHeight;
-        const myX = (myCursorLocal.x / 100) * screenWidth;
-        const myY = (myCursorLocal.y / 100) * screenHeight;
 
-        for (const id in otherCursors) {
-          const other = otherCursors[id];
-          const lastHit = lastHitByCursor[id] || 0;
+        for (const id in allCursors) {
+          const lastHit = lastHitOfCursor[id] || 0;
           if (now - lastHit < collisionCooldownMs) continue;
-
-          if (isCollidingWithCursor(myX, myY, other)) {
-            lastHitByCursor[id] = now;
-            triggerCollision({ el: myCursorEl });
-            triggerCollision(other);
+          const cursor = allCursors[id];
+          const cursorXAbs = (cursor.x / 100) * screenWidth;
+          const cursorYAbs = (cursor.y / 100) * screenHeight;
+          for (const otherId in allCursors) {
+            const other = allCursors[otherId];
+            if (id === otherId) continue;
+            const lastHit = lastHitOfCursor[otherId] || 0;
+            if (now - lastHit < collisionCooldownMs) continue;
+            if (isCollidingWithCursor(cursorXAbs, cursorYAbs, other)) {
+              lastHitOfCursor[id] = now;
+              lastHitOfCursor[otherId] = now;
+              triggerCollision(cursor);
+              triggerCollision(other);
+            }
           }
         }
       }
@@ -600,21 +609,21 @@
 
       // ─── User leaves ──────────────────────────────────────────────────
       socket.on("user-left", (id) => {
-        if (otherCursors[id]) {
+        if (allCursors[id]) {
           // Fade out their sound before removing
-          if (audioCtx && otherCursors[id].gain) {
-            const g = otherCursors[id].gain;
+          if (audioCtx && allCursors[id].gain) {
+            const g = allCursors[id].gain;
             g.gain.setTargetAtTime(0, audioCtx.currentTime, 0.1);
             // Stop oscillator after fade
             setTimeout(() => {
               try {
-                otherCursors[id].osc.stop();
+                allCursors[id].osc.stop();
               } catch (e) {}
             }, 500);
           }
-          otherCursors[id].el.remove();
-          delete otherCursors[id];
-          delete lastHitByCursor[id];
+          allCursors[id].el.remove();
+          delete allCursors[id];
+          delete lastHitOfCursor[id];
         }
       });
 
