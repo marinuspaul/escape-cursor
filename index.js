@@ -32,6 +32,50 @@ const frequencies = [
 ];
 const backgroundTracks = ["bg1.mp3", "bg2.mp3", "bg3.mp3"];
 
+// Color array for cursors
+const cursorColors = [
+  "#FF0000",  // Red
+  "#00FF00", // Lime Green
+  "#0000FF", // Blue
+  "#FFFF00", // Yellow
+  "#FF00FF", // Magenta
+  "#00FFFF", // Cyan
+  "#FFA500", // Orange
+  "#800080", // Purple
+  "#FFC0CB", // Pink
+  "#A52A2A", // Brown
+  "#32CD32", // Lime Green
+  "#FF69B4", // Hot Pink
+  "#00CED1", // Dark Turquoise
+  "#FFD700", // Gold
+  "#FF4500", // Orange Red
+  "#00FA9A", // Medium Spring Green
+];
+
+// Shape IDs
+const shapeIds = [
+  "circle",
+  "square",
+  "triangle",
+  "diamond",
+  "star",
+  "hexagon",
+  "pentagon",
+  "octagon",
+  "heart",
+  "cross",
+  "crescent",
+  "spiral"
+];
+
+function getRandomColor() {
+  return cursorColors[Math.floor(Math.random() * cursorColors.length)];
+}
+
+function getRandomShape() {
+  return shapeIds[Math.floor(Math.random() * shapeIds.length)];
+}
+
 io.on("connection", (socket) => {
   console.log("User connected:", socket.id);
 
@@ -39,7 +83,8 @@ io.on("connection", (socket) => {
   const isHost = socket.handshake.headers.referer?.includes("/host");
   console.log(`Client connected - Host: ${isHost}, ID: ${socket.id}`);
 
-  const userColor = `#ffffff`;
+  const userColor = getRandomColor();
+  const userShape = getRandomShape();
   const userFreq = frequencies[Math.floor(Math.random() * frequencies.length)];
   const userBackgroundTrack =
     backgroundTracks[Math.floor(Math.random() * backgroundTracks.length)];
@@ -47,6 +92,7 @@ io.on("connection", (socket) => {
   // Send this user their own identity
   socket.emit("welcome", {
     color: userColor,
+    shape: userShape,
     freq: userFreq,
     backgroundTrack: userBackgroundTrack,
     isHost: isHost // Let client know if it's a host
@@ -60,6 +106,7 @@ io.on("connection", (socket) => {
         x: data.x,
         y: data.y,
         color: userColor,
+        shape: userShape,
         freq: userFreq,
         isTouching: data.isTouching || false,
         isActive: data.isActive || false,
