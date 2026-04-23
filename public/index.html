@@ -2,6 +2,7 @@
 <html>
   <head>
     <title>DANCE PARTY</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <link
       href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400&display=swap"
       rel="stylesheet"
@@ -34,17 +35,17 @@
         width: 100vw;
         overflow: hidden;
         gap: 16px;
-        font-size: 2rem;
         pointer-events: none;
-      }
-
-      h1 {
         font-weight: 800;
-        text-align: center;
-        letter-spacing: 6px;
+        letter-spacing: 2px;
         text-transform: uppercase;
-        max-width: 80%;
         margin: 0;
+        font-size: 1rem;
+
+        p {
+          max-width: 80%;
+          text-align: center;
+        }
       }
 
       .cursor-wrapper {
@@ -116,8 +117,8 @@
       }
 
       .own-cursor.touch-active .cursor-circle {
-        width: 200px;
-        height: 200px;
+        width: 100px;
+        height: 100px;
       }
 
       /* Mobile-specific styles */
@@ -131,9 +132,8 @@
 
   <body>
     <div id="hero">
-      <h1>
-        Drag on screen to move. Look at the projection and dance together!
-      </h1>
+      <p>Drag on screen to move.</p>
+      <p>Look at the projection and dance together!</p>
     </div>
 
     <script src="/socket.io/socket.io.js"></script>
@@ -297,8 +297,10 @@
         // Convert absolute positions to percentages
         const screenWidth = window.innerWidth;
         const screenHeight = window.innerHeight;
-        const xPercent = (x / screenWidth) * 100;
-        const yPercent = (y / screenHeight) * 100;
+        x = clamp(x, 0, screenWidth);
+        y = clamp(y, 0, screenHeight);
+        let xPercent = (x / screenWidth) * 100;
+        let yPercent = (y / screenHeight) * 100;
 
         myCursorLocal.x = xPercent;
         myCursorLocal.y = yPercent;
@@ -315,6 +317,10 @@
           );
           myOsc.frequency.setTargetAtTime(modFreq, audioCtx.currentTime, 0.08);
         }
+      }
+
+      function clamp(num, a, b) {
+        return Math.max(Math.min(num, Math.max(a, b)), Math.min(a, b));
       }
 
       // ─── Mouse tracking ───────────────────────────────────────────────
