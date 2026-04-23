@@ -49,7 +49,8 @@
         left: 0;
         transform-origin: center;
         z-index: 2000;
-        /*transition: all 200ms ease-in-out;*/
+        transition: transform 200ms ease-out;
+        transform: scale(2);
       }
 
       /* Collision wiggle animation */
@@ -158,7 +159,16 @@
 
     <script>
       const socket = io();
-      const soundFiles = ["sound1.mp3", "sound2.mp3", "sound3.mp3"];
+      const soundFiles = [
+        "piano-1.mp3",
+        "piano-2.mp3",
+        "piano-3.mp3",
+        "piano-4.mp3",
+        "piano-5.mp3",
+        "piano-6.mp3",
+        "piano-7.mp3",
+        "piano-8.mp3",
+      ];
       const collisionPoolSize = 4;
       const soundPools = soundFiles.map((file) => {
         const src = `sound/${file}`;
@@ -168,33 +178,33 @@
           return audio;
         });
       });
-       const backgroundMusic = new Audio();
-       const allCursors = {};
-       const averagePos = { x: 0, y: 0 };
+      const backgroundMusic = new Audio();
+      const allCursors = {};
+      const averagePos = { x: 0, y: 0 };
 
-       // My own cursor state - unified object
-       let myCursor = {
-         color: null,
-         baseFreq: 220,
-         backgroundTrack: null,
-       };
-       let myCursorEl = null;
+      // My own cursor state - unified object
+      let myCursor = {
+        color: null,
+        baseFreq: 220,
+        backgroundTrack: null,
+      };
+      let myCursorEl = null;
 
-       // Trigger point state for host version
-       let triggerCatchCount = 0;
-       const MAX_TRIGGER_CATCHES = 5;
-       let triggerPointEl = document.getElementById("trigger-point");
+      // Trigger point state for host version
+      let triggerCatchCount = 0;
+      const MAX_TRIGGER_CATCHES = 5;
+      let triggerPointEl = document.getElementById("trigger-point");
 
-       let averageCursorEl = document.getElementById("average-cursor");
+      let averageCursorEl = document.getElementById("average-cursor");
 
-       let lastUpdateTime = 0;
-       let animationFrameId = null;
+      let lastUpdateTime = 0;
+      let animationFrameId = null;
 
-       // Audio
-       let audioCtx = null;
-       let myOsc = null;
-       let myGain = null;
-       let audioReady = false;
+      // Audio
+      let audioCtx = null;
+      let myOsc = null;
+      let myGain = null;
+      let audioReady = false;
 
       // Throttle
       let lastEmit = 0;
@@ -203,153 +213,153 @@
       const collisionPadding = 10;
       const lastHitOfCursor = {};
 
-        // ─── Receive own identity from server ───────────────────────────
-        socket.on("welcome", (data) => {
-         myCursor.color = data.color;
-         myCursor.baseFreq = data.freq;
-         myCursor.backgroundTrack = data.backgroundTrack;
-         const isHost = data.isHost || false;
+      // ─── Receive own identity from server ───────────────────────────
+      socket.on("welcome", (data) => {
+        myCursor.color = data.color;
+        myCursor.baseFreq = data.freq;
+        myCursor.backgroundTrack = data.backgroundTrack;
+        const isHost = data.isHost || false;
 
-         // if (myCursor.backgroundTrack) {
-         //   backgroundMusic.src = `sound/${myCursor.backgroundTrack}`;
-         //   backgroundMusic.preload = "auto";
-         //   backgroundMusic.load();
-         // }
+        // if (myCursor.backgroundTrack) {
+        //   backgroundMusic.src = `sound/${myCursor.backgroundTrack}`;
+        //   backgroundMusic.preload = "auto";
+        //   backgroundMusic.load();
+        // }
 
-         // Host version doesn't render self-cursor or broadcast movements
-         if (!isHost && !myCursorEl) {
-           // myCursorEl = createCursorElement(myCursor.color, false);
-           // myCursorEl.classList.add("own-cursor");
+        // Host version doesn't render self-cursor or broadcast movements
+        if (!isHost && !myCursorEl) {
+          // myCursorEl = createCursorElement(myCursor.color, false);
+          // myCursorEl.classList.add("own-cursor");
 
-           // Initialize at center position (50%)
-           updateMyCursorPosition(window.innerWidth / 2, window.innerHeight / 2);
-         }
-       });
+          // Initialize at center position (50%)
+          updateMyCursorPosition(window.innerWidth / 2, window.innerHeight / 2);
+        }
+      });
 
-       // ─── Receive cursor updates from other clients ──────────────────
-       socket.on("cursor-update", (data) => {
-         // First time seeing this user
-         if (!allCursors[data.id]) {
-           const el = createCursorElement(data.color, data.shape);
-           const entry = {
-             el,
-             x: 0,
-             y: 0,
-             baseFreq: data.freq,
-             osc: null,
-             gain: null,
-             isTouching: false,
-             isActive: false,
-           };
+      // ─── Receive cursor updates from other clients ──────────────────
+      socket.on("cursor-update", (data) => {
+        // First time seeing this user
+        if (!allCursors[data.id]) {
+          const el = createCursorElement(data.color, data.shape);
+          const entry = {
+            el,
+            x: 0,
+            y: 0,
+            baseFreq: data.freq,
+            osc: null,
+            gain: null,
+            isTouching: false,
+            isActive: false,
+          };
 
-           allCursors[data.id] = entry;
-         }
+          allCursors[data.id] = entry;
+        }
 
-         const c = allCursors[data.id];
-         c.x = data.x;
-         c.y = data.y;
-         c.isTouching = data.isTouching || false;
-         c.isActive = data.isActive || false;
+        const c = allCursors[data.id];
+        c.x = data.x;
+        c.y = data.y;
+        c.isTouching = data.isTouching || false;
+        c.isActive = data.isActive || false;
 
-         // Convert percentage to absolute position
-         const cursorXAbs = (c.x / 100) * window.innerWidth;
-         const cursorYAbs = (c.y / 100) * window.innerHeight;
-         
-         c.el.style.left = cursorXAbs + "px";
-         c.el.style.top = cursorYAbs + "px";
+        // Convert percentage to absolute position
+        const cursorXAbs = (c.x / 100) * window.innerWidth;
+        const cursorYAbs = (c.y / 100) * window.innerHeight;
 
-         // Update cursor color and classes based on active state
-         const shape = c.el.querySelector(".cursor-shape svg");
-         if (shape && shape.parentElement) {
-           if (c.isActive || c.isTouching) {
-             shape.style.color = "orange";
-             c.el.classList.add("active-state");
-             c.el.classList.remove("inactive-state");
-           } else {
-             shape.style.color = data.color;
-             c.el.classList.add("inactive-state");
-             c.el.classList.remove("active-state");
-           }
-         }
+        c.el.style.left = cursorXAbs + "px";
+        c.el.style.top = cursorYAbs + "px";
 
-         // Modulate their sound with their position
-         if (audioCtx && c.osc) {
-           const modFreq = modulateFreq(c.baseFreq, data.x, data.y);
-           c.osc.frequency.setTargetAtTime(modFreq, audioCtx.currentTime, 0.08);
-         }
-       });
+        // Update cursor color and classes based on active state
+        const shape = c.el.querySelector(".cursor-shape svg");
+        if (shape && shape.parentElement) {
+          if (c.isActive || c.isTouching) {
+            shape.style.color = "orange";
+            c.el.classList.add("active-state");
+            c.el.classList.remove("inactive-state");
+          } else {
+            shape.style.color = data.color;
+            c.el.classList.add("inactive-state");
+            c.el.classList.remove("active-state");
+          }
+        }
 
-       // ─── Calculate Average Position ────────────────────────────────────
-       function calculateAverage() {
-         let xSum = 0;
-         let ySum = 0;
-         let activeCursorCount = 0;
+        // Modulate their sound with their position
+        if (audioCtx && c.osc) {
+          const modFreq = modulateFreq(c.baseFreq, data.x, data.y);
+          c.osc.frequency.setTargetAtTime(modFreq, audioCtx.currentTime, 0.08);
+        }
+      });
 
-         for (const id in allCursors) {
-           const cursor = allCursors[id];
-           xSum += cursor.x;
-           ySum += cursor.y;
-           activeCursorCount++;
-         }
+      // ─── Calculate Average Position ────────────────────────────────────
+      function calculateAverage() {
+        let xSum = 0;
+        let ySum = 0;
+        let activeCursorCount = 0;
 
-         if (activeCursorCount > 0) {
-           // Convert from percentage to absolute pixels
-           averagePos.x = (xSum / activeCursorCount / 100) * window.innerWidth;
-           averagePos.y = (ySum / activeCursorCount / 100) * window.innerHeight;
-           
-           if (averageCursorEl) {
-             averageCursorEl.style.left = averagePos.x + "px";
-             averageCursorEl.style.top = averagePos.y + "px";
-           }
-         }
-       }
+        for (const id in allCursors) {
+          const cursor = allCursors[id];
+          xSum += cursor.x;
+          ySum += cursor.y;
+          activeCursorCount++;
+        }
 
-       // ─── Game Loop ──────────────────────────────────────────────────
-       function gameLoop(timestamp) {
-         const deltaTime = timestamp - lastUpdateTime;
-         lastUpdateTime = timestamp;
+        if (activeCursorCount > 0) {
+          // Convert from percentage to absolute pixels
+          averagePos.x = (xSum / activeCursorCount / 100) * window.innerWidth;
+          averagePos.y = (ySum / activeCursorCount / 100) * window.innerHeight;
 
-         // Calculate average position
-         calculateAverage();
-         // console.log(allCursors);
-         // Check for collisions
-         checkCollision();
+          if (averageCursorEl) {
+            averageCursorEl.style.left = averagePos.x + "px";
+            averageCursorEl.style.top = averagePos.y + "px";
+          }
+        }
+      }
 
-         // Check if average position collides with trigger point
-         checkTriggerCollision();
+      // ─── Game Loop ──────────────────────────────────────────────────
+      function gameLoop(timestamp) {
+        const deltaTime = timestamp - lastUpdateTime;
+        lastUpdateTime = timestamp;
 
-         // Continue the loop
-         animationFrameId = requestAnimationFrame(gameLoop);
-       }
+        // Calculate average position
+        calculateAverage();
+        // console.log(allCursors);
+        // Check for collisions
+        checkCollision();
+
+        // Check if average position collides with trigger point
+        checkTriggerCollision();
+
+        // Continue the loop
+        animationFrameId = requestAnimationFrame(gameLoop);
+      }
 
       // Start the game loop
       lastUpdateTime = performance.now();
       animationFrameId = requestAnimationFrame(gameLoop);
 
-       // ─── Cursor Position Update ────────────────────────────────────────
-       function updateMyCursorPosition(x, y) {
-         // Host doesn't display own cursor, just track position
-         // This is called from welcome handler but not used
-       }
+      // ─── Cursor Position Update ────────────────────────────────────────
+      function updateMyCursorPosition(x, y) {
+        // Host doesn't display own cursor, just track position
+        // This is called from welcome handler but not used
+      }
 
-       // ─── Audio helpers ───────────────────────────────────────────────
-       function modulateFreq(baseFreq, x, y) {
-         return baseFreq;
-       }
+      // ─── Audio helpers ───────────────────────────────────────────────
+      function modulateFreq(baseFreq, x, y) {
+        return baseFreq;
+      }
 
-       window.addEventListener("click", () => {
-         if (audioReady) return;
-         // 激活 AudioContext 並預載所有音效
-         audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-         audioReady = true;
+      window.addEventListener("click", () => {
+        if (audioReady) return;
+        // 激活 AudioContext 並預載所有音效
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        audioReady = true;
 
-         if (myCursor.backgroundTrack) {
-           backgroundMusic.loop = true;
-           backgroundMusic.volume = 0.25;
-           backgroundMusic
-             .play()
-             .catch((e) => console.error("背景音樂播放失敗:", e));
-         }
+        if (myCursor.backgroundTrack) {
+          backgroundMusic.loop = true;
+          backgroundMusic.volume = 0.25;
+          backgroundMusic
+            .play()
+            .catch((e) => console.error("背景音樂播放失敗:", e));
+        }
         soundPools.flat().forEach((sound) => {
           sound.currentTime = 0;
           sound.load();
@@ -391,34 +401,34 @@
         }
       }
 
-       // ─── Build cursor DOM element ─────────────────────────────────────
-       function createCursorElement(color, shape, isTouch) {
-         const cursor = document.createElement("div");
-         cursor.classList.add("cursor-wrapper");
-         if (isTouch) cursor.classList.add("touch-cursor");
+      // ─── Build cursor DOM element ─────────────────────────────────────
+      function createCursorElement(color, shape, isTouch) {
+        const cursor = document.createElement("div");
+        cursor.classList.add("cursor-wrapper");
+        if (isTouch) cursor.classList.add("touch-cursor");
 
-         // Get the SVG shape
-         const shapeData = getShapeById(shape);
-         if (shapeData) {
-           const svgContainer = document.createElement("div");
-           svgContainer.classList.add("cursor-shape");
-           svgContainer.innerHTML = shapeData.svg;
-           
-           // Apply color to the SVG
-           const svg = svgContainer.querySelector("svg");
-           if (svg) {
-             svg.style.color = color;
-             svg.style.width = "20px";
-             svg.style.height = "20px";
-           }
-           
-           cursor.appendChild(svgContainer);
-         }
+        // Get the SVG shape
+        const shapeData = getShapeById(shape);
+        if (shapeData) {
+          const svgContainer = document.createElement("div");
+          svgContainer.classList.add("cursor-shape");
+          svgContainer.innerHTML = shapeData.svg;
 
-         document.body.appendChild(cursor);
+          // Apply color to the SVG
+          const svg = svgContainer.querySelector("svg");
+          if (svg) {
+            svg.style.color = color;
+            svg.style.width = "20px";
+            svg.style.height = "20px";
+          }
 
-         return cursor;
-       }
+          cursor.appendChild(svgContainer);
+        }
+
+        document.body.appendChild(cursor);
+
+        return cursor;
+      }
 
       function isCollidingWithCursor(pointX, pointY, cursor) {
         if (!cursor?.el) return false;

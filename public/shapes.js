@@ -45,11 +45,6 @@ const SHAPES = {
     name: "Cross",
     svg: '<svg viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg"><g fill="currentColor"><rect x="17" y="2" width="6" height="36"/><rect x="2" y="17" width="36" height="6"/></g></svg>',
   },
-  crescent: {
-    id: "crescent",
-    name: "Crescent",
-    svg: '<svg viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg"><circle cx="20" cy="20" r="18" fill="currentColor" stroke="black" stroke-width="1"/><circle cx="24" cy="20" r="14" fill="black"/></svg>',
-  },
   spiral: {
     id: "spiral",
     name: "Spiral",
