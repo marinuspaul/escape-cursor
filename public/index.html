@@ -394,13 +394,14 @@
       }
 
       function handleTouchMove(e) {
-        if (!activeTouchId) return;
+        e.preventDefault(); // Prevent scrolling
+        // if (!activeTouchId) return;
+        console.log("touchmove");
 
         const touch = Array.from(e.touches).find(
           (t) => t.identifier === activeTouchId,
         );
         if (touch) {
-          e.preventDefault(); // Prevent scrolling
           updateMyCursorPosition(touch.clientX, touch.clientY);
         }
       }
